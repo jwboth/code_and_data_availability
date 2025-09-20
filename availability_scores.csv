@@ -1,0 +1,10 @@
+keyword,score,category
+github,1,open access
+www.,1,open access
+.com,1,open access
+zenodo,1,open access
+darus,1,open access
+request,0.5,conditional access
+contact,0.5,conditional access
+author,0.5,conditional access
+gitlab,1,open access
