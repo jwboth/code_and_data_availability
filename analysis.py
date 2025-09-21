@@ -2,6 +2,7 @@ import argparse
 import logging
 import re
 
+from pathlib import Path
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
@@ -20,10 +21,9 @@ def read_keywords_from_csv(filename):
 
 
 # Read keywords from CSV files as DataFrames
-numerical_keywords_df = pd.read_csv("numerical_keywords.csv")
-experimental_keywords_df = pd.read_csv("experimental_keywords.csv")
-availability_scores_df = pd.read_csv("availability_scores.csv")
+data_availability_scores_df = pd.read_csv("availability_scores.csv")
 open_access_scores_df = pd.read_csv("open_access_scores.csv")
+categories_df = pd.read_csv("categories.csv")
 
 
 def fetch_url(url, timeout=20):
@@ -46,25 +46,69 @@ def extract_open_access(soup):
 
 
 def extract_abstract(soup):
-    tag = soup.find("div", class_="c-article-body", attrs={"data-article-body": "true"})
-    if tag:
-        section = tag.find("section", attrs={"data-title": "Abstract"})
-        if section:
-            content = section.find("div", class_="c-article-section__content")
+    # Search among titles
+    _abstract = extract_section(soup, title=["Abstract"])
+    if _abstract:
+        return _abstract
+    # Search in meta tags if not found
+    _abstract = extract_meta(soup, content=["Abstract"])
+    if _abstract:
+        return _abstract
+    # Search on unsupported elements
+    _abstract = extract_unsupported_element(soup, keywords=["Abstract"])
+    # Allow for typos - Search among titles
+    _abstract = extract_section(soup, title=["Abstarct"])
+    if _abstract:
+        return _abstract
+    # Allow for typos - Search in meta tags if not found
+    _abstract = extract_meta(soup, content=["Abstarct"])
+    if _abstract:
+        return _abstract
 
-            return content.get_text(strip=True)
+
+def extract_unsupported_element(soup, keywords):
+    tags = soup.find("span", class_="unsupported-element u-hide")
+    if not tags:
+        return None
+    for tag in tags:
+        if all(
+            re.search(rf"{key}", tag.get_text(strip=True), re.I) for key in keywords
+        ):
+            return tag.get_text(strip=True).lower()
     return None
 
 
-def count_occurences(text, df, column_key, column_count):
+def read_dc_type(soup):
+    # Find meta with name="dc.type"
+    meta = soup.find("meta", attrs={"name": "dc.type"})
+    if meta and "content" in meta.attrs:
+        return meta["content"]
+    return None
+
+
+def identify_article_type(soup):
+    type = read_dc_type(soup)
+    for key in ["article", "paper", "report", "letter"]:
+        if type and re.search(rf"{key}", type, re.I):
+            return "article"
+    for key in ["editorial", "acknowledgment"]:
+        if type and re.search(rf"{key}", type, re.I):
+            return "editorial"
+    for key in ["erratum", "correction"]:
+        if type and re.search(rf"{key}", type, re.I):
+            return "correction"
+    raise ValueError(f"Unknown article type: {type}")
+
+
+def count_keywords(text, df):
     if not text:
         return
     counts = []
     for _, row in df.iterrows():
-        key = row[column_key]
+        key = row["keyword"]
         count = len(re.findall(rf"{key}", text, re.I))
         counts.append(count)
-    df[column_count] = counts
+    df["keyword_counter"] = counts
     return
 
 
@@ -76,38 +120,39 @@ def find_largest_counter(df_list, column):
     return max_index
 
 
-def extract_matching_keywords(df_list):
+def extract_matching_keywords(df_list, column_key, column_count):
     keywords = [
-        row["keyword"]
+        row[column_key]
         for df in df_list
         for _, row in df.iterrows()
-        if row["keyword_counter"] > 0
+        if row[column_count] > 0
     ]
-    # Convert to comma-separated string
     return ", ".join(keywords)
 
 
 def count_category(df):
-    # Make unique and remove NaN categories
-    categories = df["category"].unique()
-    categories = [cat for cat in categories if pd.notna(cat)]
-    counter = {
-        category: sum(
-            [
-                row["keyword_counter"]
-                for _, row in df.iterrows()
-                if row["category"] == category
-            ]
-        )
-        for category in categories
-    }
-    category_counter = []
-    for _, row in df.iterrows():
-        if pd.isna(row["category"]):
-            category_counter.append(0)
-        else:
-            category_counter.append(counter[row["category"]])
-    df["category_counter"] = category_counter
+    for column in ["category", "subcategory", "subcategory2"]:
+        # Make unique and remove NaN categories
+        categories = df[column].unique()
+        categories = [cat for cat in categories if pd.notna(cat)]
+        counter = {
+            category: sum(
+                [
+                    row["keyword_counter"]
+                    for _, row in df.iterrows()
+                    if row[column] == category
+                ]
+            )
+            for category in categories
+        }
+        category_counter = []
+        for _, row in df.iterrows():
+            if pd.isna(row[column]):
+                category_counter.append(0)
+            else:
+                category_counter.append(counter[row[column]])
+        df[f"{column}_counter"] = category_counter
+    return df
 
 
 def find_frequent_key(df, column_key, column_count):
@@ -198,8 +243,79 @@ def score(text, evaluation_df, empty_category="none"):
 
 
 def save_soup_to_file(soup, filename="soup.html"):
+    Path(filename).parent.mkdir(parents=True, exist_ok=True)
     with open(filename, "w", encoding="utf-8") as f:
         f.write(str(soup))
+
+
+def determine_keywords(df):
+    # Extract active keywords
+    active_df = df[df["keyword_counter"] > 0].dropna(subset=["keyword"])
+    return ", ".join(active_df["keyword"].tolist())
+
+
+def determine_classification(df):
+    # Extract active classifications
+    classification = []
+    active_df = df[df["category_counter"] > 0].dropna(subset=["category"])
+    classification = [row["category"] for _, row in active_df.iterrows()]
+    active_df = active_df[active_df["subcategory_counter"] > 0].dropna(
+        subset=["subcategory"]
+    )
+    classification += [row["subcategory"] for _, row in active_df.iterrows()]
+    active_df = active_df[active_df["subcategory2_counter"] > 0].dropna(
+        subset=["subcategory2"]
+    )
+    classification += [row["subcategory2"] for _, row in active_df.iterrows()]
+    return ", ".join(set(classification))
+
+
+def determine_category(df):
+    # Extract active categories
+    active_df = df[df["category_counter"] > 0].dropna(subset=["category"])
+    active_categories = [
+        (row["category"], row["category_counter"]) for _, row in active_df.iterrows()
+    ]
+    if len(active_categories) == 0:
+        return ("other",)
+    else:
+        category = sorted(set(active_categories), key=lambda x: x[1], reverse=True)[0][
+            0
+        ]
+
+    # Extract active subcategories
+    active_df = active_df.groupby("category").get_group(category)
+    active_df = active_df[active_df["subcategory_counter"] > 0].dropna(
+        subset=["subcategory"]
+    )
+    active_subcategories = [
+        (row["subcategory"], row["subcategory_counter"])
+        for _, row in active_df.iterrows()
+    ]
+    if len(active_subcategories) == 0:
+        return (category,)
+    else:
+        subcategory = sorted(
+            set(active_subcategories), key=lambda x: x[1], reverse=True
+        )[0][0]
+
+    # Extract active subcategories2
+    active_df = active_df[active_df["subcategory"] == subcategory].dropna(
+        subset=["subcategory2"]
+    )
+    active_df = active_df[active_df["subcategory2_counter"] > 0]
+    active_subcategories2 = [
+        (row["subcategory2"], row["subcategory2_counter"])
+        for _, row in active_df.iterrows()
+    ]
+    if len(active_subcategories2) == 0:
+        return (category, subcategory)
+    else:
+        subcategory2 = sorted(
+            set(active_subcategories2), key=lambda x: x[1], reverse=True
+        )[0][0]
+
+    return (category, subcategory, subcategory2)
 
 
 def main(input_csv, output_csv):
@@ -256,167 +372,168 @@ def main(input_csv, output_csv):
         raise ValueError("Unsupported article type found")
 
     # Containers for results
-    access_score = []
-    access_category = []
-    access_section = []
-    discipline = []
+    rights_and_permission_score = []
+    rights_and_permission_category = []
+    rights_and_permission_section = []
     category = []
+    subcategory = []
+    subcategory2 = []
     keywords = []
-    availability_score = []
-    availability_category = []
+    classification = []
+    data_availability_score = []
+    data_availability_category = []
     abstract = []
-    availability_section = []
+    data_availability_section = []
 
     for idx in range(len(df)):
-        # if not idx == 25:
-        #    continue
-        # Initialize containers for fetching content
-        out_texts = []
-        statuses = []
-
-        # Fetch URL
-        url = df["url"].iloc[idx]
-        # url = "https://link.springer.com/article/10.1007/s11242-025-02216-x"
-        if not url:
-            out_texts.append("")
-            statuses.append("no-url")
-            continue
-
-        # Fetch url
-        logging.info("[%d] Fetching %s", idx, url)
-        r = fetch_url(url)
-        if r is None:
-            out_texts.append("")
-            statuses.append("fetch-failed")
-            logging.warning("Failed to fetch URL: %s", url)
-            continue
-
-        # Convert to soup
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        # Extract whether article is experimental or computational
-        _abstract = extract_section(soup, title=["Abstract"])
-        if not _abstract:
-            _abstract = extract_meta(soup, content=["Abstract"])
-
-        # If no abstract found, mark as error, save soup for debugging, and fill in
-        # the lists with placeholders, continue with the next article
-        if not _abstract:
-            save_soup_to_file(soup, filename=f"soup_{idx}.html")
-            abstract.append("N/A")
-            access_section.append("N/A")
-            access_score.append(0)
-            access_category.append("N/A")
-            discipline.append("N/A")
-            category.append("N/A")
-            keywords.append("N/A")
-            availability_section.append("N/A")
-            availability_score.append(0)
-            availability_category.append("N/A")
-            continue
-            # raise ValueError(f"Abstract not found for {url}")
+        path = Path(f"soups/soup_{idx}.html")
+        if False and Path(path).exists():
+            with open(path, "r", encoding="utf-8") as f:
+                soup = BeautifulSoup(f, "html.parser")
         else:
-            abstract.append(_abstract)
+            # Fetch URL
+            url = df["url"].iloc[idx]
+            if not url:
+                continue
 
-        # Extract whether article is open access
+            # Fetch url
+            logging.info("[%d] Fetching %s", idx, url)
+            r = fetch_url(url)
+            if r is None:
+                logging.warning("Failed to fetch URL: %s", url)
+                continue
+
+            # Convert to soup
+            soup = BeautifulSoup(r.text, "html.parser")
+            save_soup_to_file(soup, filename=f"soups/soup_{idx}.html")
+
+        # Identify article type - only continue for "article"
+        _article_type = identify_article_type(soup)
+        if _article_type != "article":
+            category.append(_article_type)
+            subcategory.append("N/A")
+            subcategory2.append("N/A")
+            abstract.append("N/A")
+            keywords.append("N/A")
+            classification.append("N/A")
+            rights_and_permission_section.append("N/A")
+            rights_and_permission_score.append(0)
+            rights_and_permission_category.append("N/A")
+            data_availability_section.append("N/A")
+            data_availability_score.append(0)
+            data_availability_category.append("N/A")
+            continue
+
+        # Extract abstract - required
+        _abstract = extract_abstract(soup)
+        if not _abstract:
+            category.append("error")
+            subcategory.append("N/A")
+            subcategory2.append("N/A")
+            abstract.append("N/A")
+            keywords.append("N/A")
+            classification.append("N/A")
+            rights_and_permission_section.append("N/A")
+            rights_and_permission_score.append(0)
+            rights_and_permission_category.append("N/A")
+            data_availability_section.append("N/A")
+            data_availability_score.append(0)
+            data_availability_category.append("N/A")
+            continue
+        abstract.append(_abstract)
+
+        # Extract rights and permissions for article - required
         rights_and_permissions_section = extract_section(
             soup, title=["rights", "permission"]
         )
         if not rights_and_permissions_section:
-            save_soup_to_file(soup, filename=f"soup_{idx}.html")
             raise ValueError(f"Rights and permissions section not found for {url}")
-        access_section.append(rights_and_permissions_section)
-        _access_score, _access_category = score(
+        rights_and_permission_section.append(rights_and_permissions_section)
+
+        # Score rights and permission
+        _rights_and_permission_score, _rights_and_permission_category = score(
             rights_and_permissions_section,
             open_access_scores_df,
             empty_category="closed access",
         )
-        access_score.append(_access_score)
-        access_category.append(_access_category)
+        rights_and_permission_score.append(_rights_and_permission_score)
+        rights_and_permission_category.append(_rights_and_permission_category)
 
-        # Copy keyword DataFrames and add column "found" initialized to 0 for each item
-        _numerical_keywords = numerical_keywords_df.copy()
-        _experimental_keywords = experimental_keywords_df.copy()
+        # Initialize article-specific df for keyword counting
+        _df = categories_df.copy()
 
-        # Count occurrences of each keyword in the abstract
-        count_occurences(_abstract, _numerical_keywords, "keyword", "keyword_counter")
-        count_occurences(
-            _abstract, _experimental_keywords, "keyword", "keyword_counter"
-        )
+        # Find keywords
+        count_keywords(_abstract, _df)
+        _keywords = determine_keywords(_df)
+        keywords.append(_keywords)
 
-        # Post-process: count categories and find dominant
-        count_category(_numerical_keywords)
-        count_category(_experimental_keywords)
-        dominant = find_largest_counter(
-            [
-                _numerical_keywords,
-                _experimental_keywords,
-            ],
-            "keyword_counter",
-        )
-        if dominant is None:
-            discipline.append("other")
-            category.append("other")
-        if dominant == 0:
-            discipline.append("computational")
-            category.append(
-                find_frequent_key(_numerical_keywords, "category", "category_counter")
-            )
-        if dominant == 1:
-            discipline.append("experimental")
-            category.append(
-                find_frequent_key(
-                    _experimental_keywords, "category", "category_counter"
-                )
-            )
+        # Find category
+        _df = count_category(_df)
+        _category = determine_category(_df)
+        while len(_category) < 3:
+            _category = _category + ("N/A",)
+        category.append(_category[0])
+        subcategory.append(_category[1])
+        subcategory2.append(_category[2])
 
-        # Extract matching keywords
-        matching_keywords = extract_matching_keywords(
-            [_numerical_keywords, _experimental_keywords]
-        )
-        keywords.append(matching_keywords)
+        # Find classification
+        _classification = determine_classification(_df)
+        classification.append(_classification)
 
         # Extract section on data/code availability
-        _availability_section = extract_section(soup, title=["data", "avail"])
-        if not _availability_section:
-            _availability_section = extract_section(soup, title=["code", "avail"])
-        availability_section.append(_availability_section)
-        _availability_score, _availability_category = score(
-            _availability_section,
-            availability_scores_df,
+        _data_availability_section = extract_section(soup, title=["data", "avail"])
+        if not _data_availability_section:
+            _data_availability_section = extract_section(soup, title=["code", "avail"])
+        data_availability_section.append(_data_availability_section)
+
+        # Score data availability
+        _data_availability_score, _data_availability_category = score(
+            _data_availability_section,
+            data_availability_scores_df,
             empty_category="closed access",
         )
-        availability_score.append(_availability_score)
-        availability_category.append(_availability_category)
+        data_availability_score.append(_data_availability_score)
+        data_availability_category.append(_data_availability_category)
 
         # Debugging
-        print()
-        print("Debugging")
-        print("Access:", access_score[-1], access_category[-1])
-        print("Discipline:", discipline[-1])
-        print("Category", category[-1])
-        print("Keywords:", matching_keywords)
-        print("Availability score:", availability_score[-1])
-        print("Availability category:", availability_category[-1])
+        if True:
+            print()
+            print("Debugging")
+            print(
+                "Access:",
+                rights_and_permission_score[-1],
+                rights_and_permission_category[-1],
+            )
+            print("Category", category[-1])
+            print("Subcategory", subcategory[-1])
+            print("Subcategory2", subcategory2[-1])
+            print("Keywords:", keywords[-1])
+            print("Classification:", classification[-1])
+            print("Availability score:", data_availability_score[-1])
+            print("Availability category:", data_availability_category[-1])
 
-        print(
-            "rights_and_permissions_section:",
-        )
-        print("Rights and permissions section:", access_section[-1])
-        print("Abstract", abstract[-1])
-        print("Availability section:", availability_section[-1])
+            print(
+                "rights_and_permissions_section:",
+            )
+            print("Rights and permissions section:", rights_and_permission_section[-1])
+            print("Abstract", abstract[-1])
+            print("Availability section:", data_availability_section[-1])
 
-    df["article_availability_score"] = access_score
-    df["article_availability_category"] = access_category
-    df["article_availability_section"] = access_section
-    df["abstract"] = abstract
-    df["discipline"] = discipline
+    # Update data frame
     df["category"] = category
+    df["subcategory"] = subcategory
+    df["subcategory2"] = subcategory2
+    df["abstract"] = abstract
     df["keywords"] = keywords
-    df["data_availability_score"] = availability_score
-    df["data_availability_category"] = availability_category
-    df["data_availability_section"] = availability_section
+    df["classification"] = classification
+    df["article_availability_score"] = rights_and_permission_score
+    df["article_availability_category"] = rights_and_permission_category
+    df["article_availability_section"] = rights_and_permission_section
+    df["data_availability_score"] = data_availability_score
+    df["data_availability_category"] = data_availability_category
+    df["data_availability_section"] = data_availability_section
 
+    # Store data frame to file
     df.to_csv(output_csv, index=False)
     logging.info("Wrote results to %s", output_csv)
 
