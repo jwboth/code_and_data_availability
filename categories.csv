@@ -1,0 +1,82 @@
+﻿keyword,dominant,category,subcategory,subcategory2
+numeric,1,computational,computational,
+solver,0,computational,computational,
+stability,0,computational,computational,
+convergence,0,computational,computational,
+computation,0,computational,computational,
+density function,0,computational,computational,
+spe10,0,computational,simulation,
+mrst,0,computational,simulation,
+COMSOL,1,computational,simulation,
+open foam,1,computational,simulation,
+openfoam,1,computational,simulation,
+simulation,1,computational,simulation,
+large eddy,1,computational,simulation,
+\bles\b,0,computational,simulation,
+data assimilation,0,computational,parameter estimation,
+mesh,0,computational,pde,
+finite element,1,computational,pde,
+finite-element,1,computational,pde,
+fem,1,computational,pde,
+finite volume,1,computational,pde,
+finite-volume,1,computational,pde,
+FVM,1,computational,pde,
+finite difference,1,computational,pde,
+finite-difference,1,computational,pde,
+\bFD\b,1,computational,pde,
+lattice boltzmann,1,computational,pde,
+molecular dynamics,0,computational,md,
+monte carlo,1,computational,stochastics,
+probability,0,computational,stochastics,
+neural network,1,computational,ml
+PINN,1,computational,ml
+cnn\b,0,computational,ml
+\bgan\b,0,computational,ml
+\bann\b,0,computational,ml
+\bai\b,0,computational,ml
+deep learning,0,computational,ml
+machine learning,0,computational,ml,
+experiment,0,experimental,experimental,
+experimental,0,experimental,experimental,
+laboratory,0,experimental,experimental,
+image,0,experimental,imaging,
+imaging,0,experimental,imaging,
+sem,1,experimental,imaging,optical
+tomography,1,experimental,imaging,tomography
+mri\b,1,experimental,imaging,tomography
+scan,0,experimental,imaging,
+\bnmr\b,1,experimental,imaging,tomography
+resonance,1,experimental,imaging,tomography
+magnetic,1,experimental,imaging,tomography
+pet,1,experimental,imaging,tomography
+\bct\b,0,experimental,imaging,tomography
+micro-ct,0,experimental,imaging,tomography
+positron,1,experimental,imaging,tomography
+xray,1,experimental,imaging,synchrotron
+x-ray,1,experimental,imaging,synchrotron
+microscopy,1,experimental,imaging,optical
+microscope,1,experimental,imaging,optical
+optical,0,experimental,imaging,optical
+photo,0,experimental,imaging,optical
+spectromet,0,experimental,imaging,spectroscopy
+scopy,0,experimental,imaging,spectroscopy
+spectroscopy,1,experimental,imaging,spectroscopy
+raman,1,experimental,imaging,spectroscopy
+infrared,0,experimental,imaging,thermography
+synchrotron,1,experimental,imaging,synchrotron
+laser,0,experimental,imaging,laser
+segmentation,0,experimental,image analysis
+denoising,0,experimental,image analysis
+fiji,1,experimental,image analysis,
+imagej,1,experimental,image analysis,
+opencv,1,experimental,image analysis,
+scikit-image,1,experimental,image analysis,
+dicom,1,experimental,image analysis,
+avizo,1,experimental,image analysis,
+dragonfly,1,experimental,image analysis,
+geoslicer,1,experimental,image analysis,
+puma,1,experimental,image analysis,
+pypore,1,experimental,image analysis,
+sequencing,0,experimental,image analysis,
+image analysis,1,experimental,image analysis,
+porespy,1,experimental,image analysis,
