@@ -6,6 +6,7 @@ from pathlib import Path
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
+import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -319,6 +320,7 @@ def determine_category(df):
 
 
 def main(input_csv, output_csv):
+    num_redefined = 0
     df = pd.read_csv(input_csv, dtype=str)
 
     # Count articles
@@ -386,18 +388,18 @@ def main(input_csv, output_csv):
     data_availability_section = []
 
     for idx in range(len(df)):
+        url = df["url"].iloc[idx]
         path = Path(f"soups/soup_{idx}.html")
-        if False and Path(path).exists():
+        logging.info("[%d] Fetching %s", idx, url)
+        if Path(path).exists():
             with open(path, "r", encoding="utf-8") as f:
                 soup = BeautifulSoup(f, "html.parser")
         else:
             # Fetch URL
-            url = df["url"].iloc[idx]
             if not url:
                 continue
 
             # Fetch url
-            logging.info("[%d] Fetching %s", idx, url)
             r = fetch_url(url)
             if r is None:
                 logging.warning("Failed to fetch URL: %s", url)
@@ -495,8 +497,20 @@ def main(input_csv, output_csv):
         data_availability_score.append(_data_availability_score)
         data_availability_category.append(_data_availability_category)
 
+        # Make sure the data availability section is not empty if the category is 'computational' or 'experimental'
+        if np.isclose(_data_availability_score, 1) and category[-1] == "other":
+            raise ValueError(
+                f"Data availability section: {_data_availability_section}.\nCategory: '{category[-1]}' for {url}"
+            )
+        if np.isclose(_data_availability_score, 1.0) and category[-1] == "theoretical":
+            # Identify the work as computational
+            category[-1] = "computational"
+            subcategory[-1] = "N/A"
+            subcategory2[-1] = "N/A"
+            num_redefined += 1
+
         # Debugging
-        if True:
+        if False:
             print()
             print("Debugging")
             print(
@@ -536,6 +550,13 @@ def main(input_csv, output_csv):
     # Store data frame to file
     df.to_csv(output_csv, index=False)
     logging.info("Wrote results to %s", output_csv)
+
+    # Inform on redefinitions
+    if num_redefined > 0:
+        logging.info(
+            "Reclassified %d theoretical articles to computational due to full data availability score of 1.0",
+            num_redefined,
+        )
 
 
 if __name__ == "__main__":
