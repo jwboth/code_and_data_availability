@@ -9,12 +9,26 @@ parser.add_argument(
     "--input",
     "-i",
     type=str,
-    default="tipm_analysis.csv",
+    required=True,
     help="Path to the input CSV file",
 )
+parser.add_argument(
+    "--categories",
+    "-c",
+    type=str,
+    nargs="+",
+    default=["All"],
+    help="List of categories to include in the analysis",
+)
 args = parser.parse_args()
+categories = args.categories
 
+# Load the data
 df = pd.read_csv(args.input)
+
+# Restrict to given categories
+if categories != ["All"]:
+    df = df[df["category"].isin(categories)]
 
 # Display the categories
 df_by_category = df.groupby("category")
@@ -23,6 +37,7 @@ plt.figure("Category distribution")
 plt.pie(category_counts, labels=category_counts.index, autopct="%1.1f%%")
 plt.title("Category Distribution")
 plt.show()
+
 
 # Display the subcategories
 df_by_subcategory = df.groupby("subcategory")
