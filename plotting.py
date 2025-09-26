@@ -138,141 +138,148 @@ if "year" in df.columns:
     df[paper_col] = df[paper_col + "_score"].map(paper_availability_map)
     df[data_col] = df[data_col + "_score"].map(data_availability_map)
 
-    # Paper availability pie charts by period
-    if paper_col:
-        paper_cats = df[paper_col].dropna().unique().tolist()
-        trend_paper = df.groupby(["Period", paper_col]).size().unstack(fill_value=0)
-        trend_paper = trend_paper.reindex(columns=paper_cats, fill_value=0)
-        fig_paper, axes_paper = plt.subplots(
-            1, len(trend_paper.index), figsize=(4 * len(trend_paper.index), 4)
-        )
-        if len(trend_paper.index) == 1:
-            axes_paper = [axes_paper]
-        for i, period in enumerate(trend_paper.index):
-            values = trend_paper.loc[period]
-            wedges, texts, autotexts = axes_paper[i].pie(
-                values,
-                labels=None,
-                autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
-                startangle=90,
-                counterclock=False,
-                textprops={"color": "white", "fontsize": 14},
-                wedgeprops={"edgecolor": "white", "linewidth": 1},
-                colors=[paper_colors[c] for c in values.index],
+    # Paper and data availability pie charts by period, per category
+    if paper_col and data_col and "category" in df.columns:
+        for cat in categories:
+            df_cat = df[df["category"] == cat]
+            if df_cat.empty:
+                continue
+            # Paper availability
+            paper_order = ["Open access", "Not open"]
+            trend_paper = (
+                df_cat.groupby(["Period", paper_col]).size().unstack(fill_value=0)
             )
-            for autotext in autotexts:
-                autotext.set_color("white")
-                autotext.set_fontweight("bold")
-            axes_paper[i].text(
+            trend_paper = trend_paper.reindex(columns=paper_order, fill_value=0)
+            fig_paper, axes_paper = plt.subplots(
+                1, len(trend_paper.index), figsize=(4 * len(trend_paper.index), 4)
+            )
+            if len(trend_paper.index) == 1:
+                axes_paper = [axes_paper]
+            for i, period in enumerate(trend_paper.index):
+                values = trend_paper.loc[period]
+                wedges, texts, autotexts = axes_paper[i].pie(
+                    values,
+                    labels=None,
+                    autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
+                    startangle=90,
+                    counterclock=False,
+                    textprops={"color": "white", "fontsize": 14},
+                    wedgeprops={"edgecolor": "white", "linewidth": 1},
+                    colors=[paper_colors[c] for c in values.index],
+                )
+                for autotext in autotexts:
+                    autotext.set_color("white")
+                    autotext.set_fontweight("bold")
+                axes_paper[i].text(
+                    0.5,
+                    -0.05,
+                    f"{period}",
+                    ha="center",
+                    va="center",
+                    transform=axes_paper[i].transAxes,
+                    fontsize=14,
+                )
+                total = int(values.sum())
+                axes_paper[i].text(
+                    0.5,
+                    -0.15,
+                    f"#total: {total}",
+                    ha="center",
+                    va="center",
+                    transform=axes_paper[i].transAxes,
+                    fontsize=12,
+                )
+            axes_paper[-1].legend(
+                wedges,
+                values.index,
+                title="Paper Availability",
+                loc="center left",
+                bbox_to_anchor=(1, 0.5),
+            )
+            fig_paper.text(
+                0.01,
                 0.5,
-                -0.05,
-                f"{period}",
-                ha="center",
+                f"Paper Availability\n{cat}",
                 va="center",
-                transform=axes_paper[i].transAxes,
-                fontsize=14,
+                ha="center",
+                rotation=90,
+                fontsize=16,
+                transform=fig_paper.transFigure,
             )
-            # Add total count just below the period label
-            total = int(values.sum())
-            axes_paper[i].text(
+            plt.tight_layout()
+            fig_paper.savefig(
+                output_folder / f"{input_stem}_paper_availability_pies_{cat}.png",
+                dpi=dpi,
+            )
+            plt.show()
+            # Data availability
+            data_order = ["Yes", "On request", "No"]
+            trend_data = (
+                df_cat.groupby(["Period", data_col]).size().unstack(fill_value=0)
+            )
+            trend_data = trend_data.reindex(columns=data_order, fill_value=0)
+            fig_data, axes_data = plt.subplots(
+                1, len(trend_data.index), figsize=(4 * len(trend_data.index), 4)
+            )
+            if len(trend_data.index) == 1:
+                axes_data = [axes_data]
+            for i, period in enumerate(trend_data.index):
+                values = trend_data.loc[period]
+                wedges, texts, autotexts = axes_data[i].pie(
+                    values,
+                    labels=None,
+                    autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
+                    startangle=90,
+                    counterclock=False,
+                    textprops={"color": "white", "fontsize": 14},
+                    wedgeprops={"edgecolor": "white", "linewidth": 1},
+                    colors=[data_colors[c] for c in values.index],
+                )
+                for autotext in autotexts:
+                    autotext.set_color("white")
+                    autotext.set_fontweight("bold")
+                axes_data[i].text(
+                    0.5,
+                    -0.05,
+                    f"{period}",
+                    ha="center",
+                    va="center",
+                    transform=axes_data[i].transAxes,
+                    fontsize=14,
+                )
+                total = int(values.sum())
+                axes_data[i].text(
+                    0.5,
+                    -0.15,
+                    f"#total: {total}",
+                    ha="center",
+                    va="center",
+                    transform=axes_data[i].transAxes,
+                    fontsize=12,
+                )
+            axes_data[-1].legend(
+                wedges,
+                values.index,
+                title="Data Availability",
+                loc="center left",
+                bbox_to_anchor=(1, 0.5),
+            )
+            fig_data.text(
+                0.01,
                 0.5,
-                -0.15,
-                f"#total: {total}",
-                ha="center",
+                f"Data Availability\n{cat}",
                 va="center",
-                transform=axes_paper[i].transAxes,
-                fontsize=12,
-            )
-        axes_paper[-1].legend(
-            wedges,
-            values.index,
-            title="Paper Availability",
-            loc="center left",
-            bbox_to_anchor=(1, 0.5),
-        )
-        fig_paper.text(
-            0.01,
-            0.5,
-            "Paper Availability",
-            va="center",
-            ha="center",
-            rotation=90,
-            fontsize=16,
-            transform=fig_paper.transFigure,
-        )
-        plt.tight_layout()
-        fig_paper.savefig(
-            output_folder / f"{input_stem}_paper_availability_pies.png", dpi=dpi
-        )
-        plt.show()
-
-    # Data availability pie charts by period
-    if data_col:
-        data_cats = df[data_col].dropna().unique().tolist()
-        trend_data = df.groupby(["Period", data_col]).size().unstack(fill_value=0)
-        trend_data = trend_data.reindex(columns=data_cats, fill_value=0)
-        fig_data, axes_data = plt.subplots(
-            1, len(trend_data.index), figsize=(4 * len(trend_data.index), 4)
-        )
-        if len(trend_data.index) == 1:
-            axes_data = [axes_data]
-        for i, period in enumerate(trend_data.index):
-            values = trend_data.loc[period]
-            wedges, texts, autotexts = axes_data[i].pie(
-                values,
-                labels=None,
-                autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
-                startangle=90,
-                counterclock=False,
-                textprops={"color": "white", "fontsize": 14},
-                wedgeprops={"edgecolor": "white", "linewidth": 1},
-                colors=[data_colors[c] for c in values.index],
-            )
-            for autotext in autotexts:
-                autotext.set_color("white")
-                autotext.set_fontweight("bold")
-            axes_data[i].text(
-                0.5,
-                -0.05,
-                f"{period}",
                 ha="center",
-                va="center",
-                transform=axes_data[i].transAxes,
-                fontsize=14,
+                rotation=90,
+                fontsize=16,
+                transform=fig_data.transFigure,
             )
-            # Add total count just below the period label
-            total = int(values.sum())
-            axes_data[i].text(
-                0.5,
-                -0.15,
-                f"#total: {total}",
-                ha="center",
-                va="center",
-                transform=axes_data[i].transAxes,
-                fontsize=12,
+            plt.tight_layout()
+            fig_data.savefig(
+                output_folder / f"{input_stem}_data_availability_pies_{cat}.png",
+                dpi=dpi,
             )
-        axes_data[-1].legend(
-            wedges,
-            values.index,
-            title="Data Availability",
-            loc="center left",
-            bbox_to_anchor=(1, 0.5),
-        )
-        fig_data.text(
-            0.01,
-            0.5,
-            "Data Availability",
-            va="center",
-            ha="center",
-            rotation=90,
-            fontsize=16,
-            transform=fig_data.transFigure,
-        )
-        plt.tight_layout()
-        fig_data.savefig(
-            output_folder / f"{input_stem}_data_availability_pies.png", dpi=dpi
-        )
-        plt.show()
+            plt.show()
 
 
 def statistics_over_time(df, column, entries):
