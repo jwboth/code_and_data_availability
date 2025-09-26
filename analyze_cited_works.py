@@ -11,6 +11,8 @@ import seaborn as sns
 from pathlib import Path
 
 path = Path("cited_works") / "data for ASIC.xlsx"
+save_folder = Path("cited_works") / "figures"
+save_folder.mkdir(parents=True, exist_ok=True)
 
 # 0. Load data
 data = pd.read_excel(path, sheet_name="Ark1")
@@ -101,80 +103,165 @@ ai_colors = {
     "Yes": "tab:blue",
 }
 
+
 # -------------------------
 # 6. Create figure with subplots
 # -------------------------
-# Total number
-totals = return_total_number_per_period("paper_availability_final")
-fig, axes = plt.subplots(6, 1, figsize=(16, 25))  # 5 rows × 2 columns
-plt.subplots_adjust(hspace=20)
+# Set global font size for all plots
+plt.rcParams.update({"font.size": 16})
 
-# --- Row 1: Paper Availability ---
-(trend_paper.div(trend_paper.sum(axis=1), axis=0) * 100).plot(
-    kind="bar",
-    stacked=True,
-    ax=axes[0],
-    color=[paper_colors[c] for c in trend_paper.columns],
+
+# --- Grouped Pie Charts: Paper, Code, Data Availability ---
+def autopct_func(pct):
+    return f"{pct:.1f}%" if pct > 0 else ""
+
+
+fig_paper, axes_paper = plt.subplots(
+    1, len(trend_paper.index), figsize=(4 * len(trend_paper.index), 4)
 )
-
-axes[0].set_title("Paper Availability over time (%)")
-axes[0].set_ylabel("Percentage")
-# Write the x-labels horizontally
-# axes[0].set_xlabel("Period", rotation=0)
-axes[0].legend(title="Paper Availability")
-axes[0].set_xticklabels(axes[0].get_xticklabels(), rotation=0)
-
-# --- Row 2: Code Availability ---
-(trend_code.div(trend_code.sum(axis=1), axis=0) * 100).plot(
-    kind="bar",
-    stacked=True,
-    ax=axes[1],
-    color=[code_colors[c] for c in trend_code.columns],
+if len(trend_paper.index) == 1:
+    axes_paper = [axes_paper]
+for i, period in enumerate(trend_paper.index):
+    values = trend_paper.loc[period]
+    wedges, texts, autotexts = axes_paper[i].pie(
+        values,
+        labels=None,  # No labels on the pie
+        autopct=autopct_func,  # Show percent only if > 0
+        colors=[paper_colors[c] for c in values.index],
+        startangle=90,
+        counterclock=False,
+        textprops={"color": "white", "fontsize": 16},
+    )
+    for autotext in autotexts:
+        autotext.set_color("white")
+        autotext.set_fontweight("bold")
+    # Place period label below the pie (line split for PEP8)
+    axes_paper[i].text(
+        0.5,
+        -0.00,
+        f"{period}",
+        ha="center",
+        va="center",
+        transform=axes_paper[i].transAxes,
+        fontsize=16,
+    )
+# Add a single legend to the last pie only, using the last values and wedges
+axes_paper[-1].legend(
+    wedges,
+    values.index,
+    title="Paper Availability",
+    loc="center left",
+    bbox_to_anchor=(1, 0.5),
 )
-axes[1].set_title("Code Availability over time (%)")
-axes[1].set_ylabel("Percentage")
-# axes[1].set_xlabel("Period")
-axes[1].legend(title="Code Availability")
-axes[1].set_xticklabels(axes[1].get_xticklabels(), rotation=0)
+fig_paper.suptitle("Paper Availability", fontsize=16)
+plt.tight_layout()
+fig_paper.savefig(save_folder / "paper_availability_pies.png", dpi=300)
+plt.show()
 
-# --- Row 3: Data Availability ---
-(trend_data.div(trend_data.sum(axis=1), axis=0) * 100).plot(
-    kind="bar",
-    stacked=True,
-    ax=axes[2],
-    color=[data_colors[c] for c in trend_data.columns],
+fig_code, axes_code = plt.subplots(
+    1, len(trend_code.index), figsize=(4 * len(trend_code.index), 4)
 )
-axes[2].set_title("Data Availability over time (%)")
-axes[2].set_ylabel("Percentage")
-# axes[2].set_xlabel("Period")
-axes[2].legend(title="Data Availability")
-axes[2].set_xticklabels(axes[2].get_xticklabels(), rotation=0)
+if len(trend_code.index) == 1:
+    axes_code = [axes_code]
+for i, period in enumerate(trend_code.index):
+    values = trend_code.loc[period]
+    wedges, texts, autotexts = axes_code[i].pie(
+        values,
+        labels=None,
+        autopct=autopct_func,
+        colors=[code_colors[c] for c in values.index],
+        startangle=90,
+        counterclock=False,
+        textprops={"color": "white", "fontsize": 16},
+    )
+    for autotext in autotexts:
+        autotext.set_color("white")
+        autotext.set_fontweight("bold")
+    axes_code[i].text(
+        0.5,
+        -0.0,
+        f"{period}",
+        ha="center",
+        va="center",
+        transform=axes_code[i].transAxes,
+        fontsize=16,
+    )
+axes_code[-1].legend(
+    wedges,
+    values.index,
+    title="Code Availability",
+    loc="center left",
+    bbox_to_anchor=(1, 0.5),
+)
+fig_code.suptitle("Code Availability", fontsize=16)
+plt.tight_layout()
+fig_code.savefig(save_folder / "code_availability_pies.png", dpi=300)
+plt.show()
 
-# --- Row 4: AI Included ---
+fig_data, axes_data = plt.subplots(
+    1, len(trend_data.index), figsize=(4 * len(trend_data.index), 4)
+)
+if len(trend_data.index) == 1:
+    axes_data = [axes_data]
+for i, period in enumerate(trend_data.index):
+    values = trend_data.loc[period]
+    wedges, texts, autotexts = axes_data[i].pie(
+        values,
+        labels=None,
+        autopct=autopct_func,
+        colors=[data_colors[c] for c in values.index],
+        startangle=90,
+        counterclock=False,
+        textprops={"color": "white", "fontsize": 16},
+    )
+    for autotext in autotexts:
+        autotext.set_color("white")
+        autotext.set_fontweight("bold")
+    axes_data[i].text(
+        0.5,
+        -0.0,
+        f"{period}",
+        ha="center",
+        va="center",
+        transform=axes_data[i].transAxes,
+        fontsize=16,
+    )
+axes_data[-1].legend(
+    wedges,
+    values.index,
+    title="Data Availability",
+    loc="center left",
+    bbox_to_anchor=(1, 0.5),
+)
+fig_data.suptitle("Data Availability", fontsize=16)
+plt.tight_layout()
+fig_data.savefig(save_folder / "data_availability_pies.png", dpi=300)
+plt.show()
+
+# --- AI Included Bar Plot ---
 (trend_ai.div(trend_ai.sum(axis=1), axis=0) * 100).plot(
     kind="bar",
     stacked=True,
-    ax=axes[3],
     color=[ai_colors[c] for c in trend_ai.columns],
 )
-axes[3].set_title("AI Included over time (%)")
-axes[3].set_ylabel("Percentage")
-# axes[3].set_xlabel("Period")
-axes[3].legend(title="AI Included")
-axes[3].set_xticklabels(axes[3].get_xticklabels(), rotation=0)
+plt.title("AI Included over time (%)")
+plt.ylabel("Percentage")
+plt.legend(title="AI Included")
+plt.xticks(rotation=0)
+plt.tight_layout()
+plt.show()
 
-# --- Row 5: Citation plots side by side ---
-# Citation vs Paper Availability
+# --- Citation vs Paper Availability ---
+fig, ax = plt.subplots(figsize=(8, 5))
 sns.scatterplot(
     data=data,
     x="Year",
     y="citation",
     hue="paper_availability_final",
-    ax=axes[4],
     s=50,
     palette=paper_colors,
+    ax=ax,
 )
-# sns.regplot(data=data, x="Year", y="citation", scatter=False, color="gray", ax=axes[4])
 for period in labels:
     period_data = data[data["Period"] == period][
         data["paper_availability_final"] == "Open access"
@@ -185,7 +272,7 @@ for period in labels:
             x="Year",
             y="citation",
             scatter=False,
-            ax=axes[4],
+            ax=ax,
             color="tab:green",
         )
     period_data = data[data["Period"] == period][
@@ -197,27 +284,28 @@ for period in labels:
             x="Year",
             y="citation",
             scatter=False,
-            ax=axes[4],
+            ax=ax,
             color="tab:red",
         )
-axes[4].set_title("Citation vs Year by Paper Availability")
-axes[4].set_ylabel("Citations")
-axes[4].set_xlabel("Year")
-axes[4].set_yscale("log")
-axes[4].legend(title="Paper Availability")
+ax.set_title("Citation vs Year by Paper Availability")
+ax.set_ylabel("Citations")
+ax.set_xlabel("Year")
+ax.set_yscale("log")
+ax.legend(title="Paper Availability")
+plt.tight_layout()
+plt.show()
 
-# Citation vs Data Availability
+# --- Citation vs Data Availability ---
+fig, ax = plt.subplots(figsize=(8, 5))
 sns.scatterplot(
     data=data,
     x="Year",
     y="citation",
     hue="data_availability_final",
-    ax=axes[5],
     s=50,
     palette=data_colors,
+    ax=ax,
 )
-# Make a regression for each period
-# sns.regplot(data=data, x="Year", y="citation", scatter=False, color="gray", ax=axes[5])
 for period in labels:
     period_data = data[data["Period"] == period][
         (data["data_availability_final"] == "Yes")
@@ -229,7 +317,7 @@ for period in labels:
             x="Year",
             y="citation",
             scatter=False,
-            ax=axes[5],
+            ax=ax,
             color="tab:green",
         )
     period_data = data[data["Period"] == period][
@@ -241,20 +329,13 @@ for period in labels:
             x="Year",
             y="citation",
             scatter=False,
-            ax=axes[5],
+            ax=ax,
             color="tab:red",
         )
-axes[5].set_title("Citation vs Year by Data Availability")
-axes[5].set_ylabel("Citations")
-axes[5].set_xlabel("Year")
-axes[5].set_yscale("log")
-axes[5].legend(title="Data Availability")
-
-for j in range(4):
-    for i, total in enumerate(totals):
-        axes[j].text(i, 50, str(total), ha="center")
-
-# -------------------------
+ax.set_title("Citation vs Year by Data Availability")
+ax.set_ylabel("Citations")
+ax.set_xlabel("Year")
+ax.set_yscale("log")
+ax.legend(title="Data Availability")
 plt.tight_layout()
-plt.savefig("all_trends_combined_fixed_colors.png", dpi=300)
 plt.show()
