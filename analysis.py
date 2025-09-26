@@ -98,6 +98,9 @@ def identify_article_type(soup):
     for key in ["erratum", "correction"]:
         if type and re.search(rf"{key}", type, re.I):
             return "correction"
+    for key in ["briefcommunication"]:
+        if type and re.search(rf"{key}", type, re.I):
+            return "short"
     raise ValueError(f"Unknown article type: {type}")
 
 
@@ -389,25 +392,20 @@ def main(input_csv, output_csv):
 
     for idx in range(len(df)):
         url = df["url"].iloc[idx]
-        path = Path(f"soups/soup_{idx}.html")
+        path = Path(f"soups_{input_csv.stem}/soup_{idx}.html")
         logging.info("[%d] Fetching %s", idx, url)
         if Path(path).exists():
             with open(path, "r", encoding="utf-8") as f:
                 soup = BeautifulSoup(f, "html.parser")
         else:
-            # Fetch URL
-            if not url:
-                continue
-
             # Fetch url
             r = fetch_url(url)
             if r is None:
-                logging.warning("Failed to fetch URL: %s", url)
-                continue
+                raise ValueError("Failed to fetch URL: %s", url)
 
             # Convert to soup
             soup = BeautifulSoup(r.text, "html.parser")
-            save_soup_to_file(soup, filename=f"soups/soup_{idx}.html")
+            save_soup_to_file(soup, filename=path)
 
         # Identify article type - only continue for "article"
         _article_type = identify_article_type(soup)
@@ -499,10 +497,17 @@ def main(input_csv, output_csv):
 
         # Make sure the data availability section is not empty if the category is 'computational' or 'experimental'
         if np.isclose(_data_availability_score, 1) and category[-1] == "other":
-            raise ValueError(
-                f"Data availability section: {_data_availability_section}.\nCategory: '{category[-1]}' for {url}"
-            )
-        if np.isclose(_data_availability_score, 1.0) and category[-1] == "theoretical":
+            if re.search("code", data_availability_section[-1], re.I):
+                category[-1] = "computational"
+                subcategory[-1] = "N/A"
+                subcategory2[-1] = "N/A"
+                num_redefined += 1
+        # if np.isclose(_data_availability_score, 1) and category[-1] == "other":
+        #    raise ValueError(
+        #        f"Data availability section: {_data_availability_section}.\nCategory: '{category[-1]}' for {url}"
+        #    )
+        # if np.isclose(_data_availability_score, 1.0) and category[-1] == "theoretical":
+        if _data_availability_score > 0.1 and category[-1] == "theoretical":
             # Identify the work as computational
             category[-1] = "computational"
             subcategory[-1] = "N/A"
@@ -533,6 +538,13 @@ def main(input_csv, output_csv):
             print("Abstract", abstract[-1])
             print("Availability section:", data_availability_section[-1])
 
+    # Inform on redefinitions
+    if num_redefined > 0:
+        logging.info(
+            "Reclassified %d theoretical articles to computational due to full data availability score of 1.0",
+            num_redefined,
+        )
+
     # Update data frame
     df["category"] = category
     df["subcategory"] = subcategory
@@ -551,13 +563,6 @@ def main(input_csv, output_csv):
     df.to_csv(output_csv, index=False)
     logging.info("Wrote results to %s", output_csv)
 
-    # Inform on redefinitions
-    if num_redefined > 0:
-        logging.info(
-            "Reclassified %d theoretical articles to computational due to full data availability score of 1.0",
-            num_redefined,
-        )
-
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser(
@@ -568,4 +573,4 @@ if __name__ == "__main__":
         "--output", "-o", default="with_data_availability.csv", help="output CSV file"
     )
     args = p.parse_args()
-    main(args.input, args.output)
+    main(Path(args.input), Path(args.output))
