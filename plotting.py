@@ -1,8 +1,12 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 import argparse
+
+dpi = 100
+plt.rcParams.update({"font.size": 20})
 
 parser = argparse.ArgumentParser(description="Visualize article analysis results")
 parser.add_argument(
@@ -24,7 +28,12 @@ args = parser.parse_args()
 categories = args.categories
 
 # Load the data
-df = pd.read_csv(args.input)
+input_path = Path(args.input)
+df = pd.read_csv(input_path)
+
+# Prepare output folder and stem for filenames
+output_folder = input_path.parent
+input_stem = input_path.stem
 
 # Restrict to given categories
 if categories != ["All"]:
@@ -33,35 +42,243 @@ if categories != ["All"]:
 # Display the categories
 df_by_category = df.groupby("category")
 category_counts = df_by_category.size()
-plt.figure("Category distribution")
+category_fig = plt.figure("Category distribution")
 plt.pie(category_counts, labels=category_counts.index, autopct="%1.1f%%")
 plt.title("Category Distribution")
+category_fig.savefig(output_folder / f"{input_stem}_category_distribution.png", dpi=dpi)
 plt.show()
-
 
 # Display the subcategories
 df_by_subcategory = df.groupby("subcategory")
 subcategory_counts = df_by_subcategory.size()
-plt.figure("Subcategory distribution")
+subcategory_fig = plt.figure("Subcategory distribution")
 plt.pie(subcategory_counts, labels=subcategory_counts.index, autopct="%1.1f%%")
 plt.title("Subcategory Distribution")
+subcategory_fig.savefig(
+    output_folder / f"{input_stem}_subcategory_distribution.png", dpi=dpi
+)
 plt.show()
+
+# --- Subcategory count per year: line plot ---
+subcategory_palette = plt.get_cmap("tab20")
+subcategory_colors = {
+    subcat: subcategory_palette(i % 20)
+    for i, subcat in enumerate(subcategory_counts.index)
+}
+paper_colors = {
+    "Not open": "tab:red",
+    "Open access": "tab:green",
+}
+data_colors = {
+    "No": "tab:red",
+    "On request": "#FFC300",  # bright dark yellow
+    "Yes": "tab:green",
+}
+
+subcategory_year_counts = (
+    df.groupby(["year", "subcategory"]).size().unstack(fill_value=0)
+)
+fig_subcat_line, ax = plt.subplots(figsize=(8, 5))
+for i, subcat in enumerate(subcategory_counts.index):
+    ax.plot(
+        subcategory_year_counts.index,
+        subcategory_year_counts[subcat],
+        label=subcat,
+        color=subcategory_colors[subcat],
+        marker="o",
+    )
+ax.set_xlabel("Year")
+ax.set_ylabel("Number of submissions")
+ax.set_title("Number of Submissions per Subcategory per Year")
+ax.legend(title="Subcategory", bbox_to_anchor=(1.05, 1), loc="upper left")
+fig_subcat_line.tight_layout()
+fig_subcat_line.savefig(
+    output_folder / f"{input_stem}_subcategory_per_year.png", dpi=dpi
+)
+plt.show()
+
+# --- Category count per year: line plot ---
+category_year_counts = df.groupby(["year", "category"]).size().unstack(fill_value=0)
+fig_cat_line, ax = plt.subplots(figsize=(8, 5))
+for i, cat in enumerate(category_counts.index):
+    ax.plot(
+        category_year_counts.index,
+        category_year_counts[cat],
+        label=cat,
+        marker="o",
+    )
+ax.set_xlabel("Year")
+ax.set_ylabel("Number of submissions")
+ax.set_title("Number of Submissions per Category per Year")
+ax.legend(title="Category", bbox_to_anchor=(1.05, 1), loc="upper left")
+fig_cat_line.tight_layout()
+fig_cat_line.savefig(output_folder / f"{input_stem}_category_per_year.png", dpi=dpi)
+plt.show()
+
+# --- Grouped Pie Charts by 5-year Periods: Paper and Data Availability ---
+# Create 5-year bins
+admissible_starts = set([2021 - 5 * i for i in range(0, 20)])
+if "year" in df.columns:
+    bin_size = 5
+    min_year = int(df["year"].min())
+    start = max([s for s in admissible_starts if s <= min_year])
+    end = int(df["year"].max()) + 1
+    bins = list(range(start, end + 1, bin_size))
+    labels = [f"{bins[i]}-{bins[i + 1] - 1}" for i in range(len(bins) - 1)]
+    labels[0] = f"{max(bins[0], min_year)}-{bins[1] - 1}"
+    df["Period"] = pd.cut(df["year"], bins=bins, labels=labels, right=False)
+
+    # Standardize paper/data availability columns if present
+    paper_col = "article_availability"
+    data_col = "data_availability"
+
+    # Map scores 0 to "No", 0.5 to "On request", 1 to "Yes"
+    paper_availability_map = {0: "Not open", 1: "Open access"}
+    data_availability_map = {0: "No", 0.5: "On request", 1: "Yes"}
+    df[paper_col] = df[paper_col + "_score"].map(paper_availability_map)
+    df[data_col] = df[data_col + "_score"].map(data_availability_map)
+
+    # Paper availability pie charts by period
+    if paper_col:
+        paper_cats = df[paper_col].dropna().unique().tolist()
+        trend_paper = df.groupby(["Period", paper_col]).size().unstack(fill_value=0)
+        trend_paper = trend_paper.reindex(columns=paper_cats, fill_value=0)
+        fig_paper, axes_paper = plt.subplots(
+            1, len(trend_paper.index), figsize=(4 * len(trend_paper.index), 4)
+        )
+        if len(trend_paper.index) == 1:
+            axes_paper = [axes_paper]
+        for i, period in enumerate(trend_paper.index):
+            values = trend_paper.loc[period]
+            wedges, texts, autotexts = axes_paper[i].pie(
+                values,
+                labels=None,
+                autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
+                startangle=90,
+                counterclock=False,
+                textprops={"color": "white", "fontsize": 14},
+                wedgeprops={"edgecolor": "white", "linewidth": 1},
+                colors=[paper_colors[c] for c in values.index],
+            )
+            for autotext in autotexts:
+                autotext.set_color("white")
+                autotext.set_fontweight("bold")
+            axes_paper[i].text(
+                0.5,
+                -0.05,
+                f"{period}",
+                ha="center",
+                va="center",
+                transform=axes_paper[i].transAxes,
+                fontsize=14,
+            )
+            # Add total count just below the period label
+            total = int(values.sum())
+            axes_paper[i].text(
+                0.5,
+                -0.15,
+                f"#total: {total}",
+                ha="center",
+                va="center",
+                transform=axes_paper[i].transAxes,
+                fontsize=12,
+            )
+        axes_paper[-1].legend(
+            wedges,
+            values.index,
+            title="Paper Availability",
+            loc="center left",
+            bbox_to_anchor=(1, 0.5),
+        )
+        fig_paper.text(
+            0.01,
+            0.5,
+            "Paper Availability",
+            va="center",
+            ha="center",
+            rotation=90,
+            fontsize=16,
+            transform=fig_paper.transFigure,
+        )
+        plt.tight_layout()
+        fig_paper.savefig(
+            output_folder / f"{input_stem}_paper_availability_pies.png", dpi=dpi
+        )
+        plt.show()
+
+    # Data availability pie charts by period
+    if data_col:
+        data_cats = df[data_col].dropna().unique().tolist()
+        trend_data = df.groupby(["Period", data_col]).size().unstack(fill_value=0)
+        trend_data = trend_data.reindex(columns=data_cats, fill_value=0)
+        fig_data, axes_data = plt.subplots(
+            1, len(trend_data.index), figsize=(4 * len(trend_data.index), 4)
+        )
+        if len(trend_data.index) == 1:
+            axes_data = [axes_data]
+        for i, period in enumerate(trend_data.index):
+            values = trend_data.loc[period]
+            wedges, texts, autotexts = axes_data[i].pie(
+                values,
+                labels=None,
+                autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
+                startangle=90,
+                counterclock=False,
+                textprops={"color": "white", "fontsize": 14},
+                wedgeprops={"edgecolor": "white", "linewidth": 1},
+                colors=[data_colors[c] for c in values.index],
+            )
+            for autotext in autotexts:
+                autotext.set_color("white")
+                autotext.set_fontweight("bold")
+            axes_data[i].text(
+                0.5,
+                -0.05,
+                f"{period}",
+                ha="center",
+                va="center",
+                transform=axes_data[i].transAxes,
+                fontsize=14,
+            )
+            # Add total count just below the period label
+            total = int(values.sum())
+            axes_data[i].text(
+                0.5,
+                -0.15,
+                f"#total: {total}",
+                ha="center",
+                va="center",
+                transform=axes_data[i].transAxes,
+                fontsize=12,
+            )
+        axes_data[-1].legend(
+            wedges,
+            values.index,
+            title="Data Availability",
+            loc="center left",
+            bbox_to_anchor=(1, 0.5),
+        )
+        fig_data.text(
+            0.01,
+            0.5,
+            "Data Availability",
+            va="center",
+            ha="center",
+            rotation=90,
+            fontsize=16,
+            transform=fig_data.transFigure,
+        )
+        plt.tight_layout()
+        fig_data.savefig(
+            output_folder / f"{input_stem}_data_availability_pies.png", dpi=dpi
+        )
+        plt.show()
 
 
 def statistics_over_time(df, column, entries):
     num_entries = len(entries)
     # Use intuitive colors for open, conditional, closed
     # Open: green, Conditional: orange, Closed: red
-    base_open = ["#4CAF50", "#81C784", "#388E3C"]  # green shades
-    base_conditional = ["#FF9800", "#FFB74D", "#F57C00"]  # orange shades
-    base_closed = ["#F44336", "#E57373", "#B71C1C"]  # red shades
-    open_colors = (base_open * ((num_entries // len(base_open)) + 1))[:num_entries]
-    conditional_colors = (
-        base_conditional * ((num_entries // len(base_conditional)) + 1)
-    )[:num_entries]
-    closed_colors = (base_closed * ((num_entries // len(base_closed)) + 1))[
-        :num_entries
-    ]
 
     # assert set(df[column].unique().tolist()) == set(entries)
     years = []
@@ -119,98 +336,9 @@ def statistics_over_time(df, column, entries):
         -width / num_entries, width / num_entries, num_entries + 1
     )[:-1]
 
-    # Additional plot: Total article counts over the years (no availability info)
-    plt.figure("Total Article Counts Over Time")
-    for idx, entry in enumerate(entries):
-        plt.bar(
-            x + displacement[idx],
-            np.array(total_counts[entry]),
-            label=entry,
-            color=np.array([0.8, 0.8, 0.8]) * (num_entries - idx / 2) / num_entries,
-        )
-    plt.xlabel("Year")
-    plt.ylabel("Number of articles")
-    plt.title("Total Article Counts Over Time")
-    plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
-    plt.tight_layout()
-    plt.show()
-
-    plt.figure("Open vs closed access over time (stacked bar)")
-
-    for idx, entry in enumerate(entries):
-        if entry not in total_counts:
-            continue
-        plt.bar(
-            x + displacement[idx],
-            np.array(open_access_counts[entry]),
-            width=width / 2,
-            label=f"{entry} - Open",
-            color=open_colors[idx],
-        )
-        plt.bar(
-            x + displacement[idx],
-            np.array(closed_access_counts[entry]),
-            width=width / 2,
-            bottom=np.array(open_access_counts[entry]),
-            label=f"{entry} - Closed",
-            color=closed_colors[idx],
-        )
-
-    plt.xticks(x, years)
-    plt.xlabel("Year")
-    plt.ylabel("Number of articles")
-    plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
-    plt.title("Open vs Closed Access Over Time (Stacked Bar)")
-    plt.tight_layout()
-    plt.show()
-
-    # Additional plot: Data availability (open, conditional, closed) over time,
-    # split by category
-    plt.figure("Data availability over time (stacked bar)")
-    width = 0.6
-    x = np.arange(len(years))
-
-    # Stacked bars for computational
-    for idx, entry in enumerate(entries):
-        if entry not in total_counts:
-            continue
-        data_open = np.array(open_access_data_availability_counts[entry])
-        data_conditional = np.array(conditional_access_data_availability_counts[entry])
-        data_closed = np.array(closed_access_data_availability_counts[entry])
-        plt.bar(
-            x + displacement[idx],
-            data_open,
-            width=width / 2,
-            label=f"{entry} - Open",
-            color=open_colors[idx],
-        )
-        plt.bar(
-            x + displacement[idx],
-            data_conditional,
-            width=width / 2,
-            bottom=data_open,
-            label=f"{entry} - Conditional",
-            color=conditional_colors[idx],
-        )
-        plt.bar(
-            x + displacement[idx],
-            data_closed,
-            width=width / 2,
-            bottom=data_open + data_conditional,
-            label=f"{entry} - Closed",
-            color=closed_colors[idx],
-        )
-
-    plt.xticks(x, years)
-    plt.xlabel("Year")
-    plt.ylabel("Number of articles")
-    plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
-    plt.title("Data Availability Over Time (Stacked Bar)")
-    plt.tight_layout()
-    plt.show()
-
-    # Additional plot: Article availability (open, closed) over time, relative to total counts (percent)
-    plt.figure("Relative Article availability over time (stacked bar, %)")
+    # Only keep relative plots (remove absolute/total count plots)
+    # --- Relative Article availability over time (stacked bar, %) ---
+    fig1 = plt.figure("Relative Article availability over time (stacked bar, %)")
     for idx, entry in enumerate(entries):
         if entry not in total_counts:
             continue
@@ -227,16 +355,16 @@ def statistics_over_time(df, column, entries):
             x + displacement[idx],
             article_open_rel,
             width=width / num_entries,
-            label=f"{entry} - Open",
-            color=open_colors[idx],
+            label="Open access",
+            color=paper_colors["Open access"],
         )
         plt.bar(
             x + displacement[idx],
             article_closed_rel,
             width=width / num_entries,
             bottom=article_open_rel,
-            label=f"{entry} - Closed",
-            color=closed_colors[idx],
+            label="Not open",
+            color=paper_colors["Not open"],
         )
 
     plt.xticks(x, years)
@@ -246,11 +374,13 @@ def statistics_over_time(df, column, entries):
     plt.title("Relative Article Availability Over Time (Stacked Bar, %)")
     plt.ylim(0, 100)
     plt.tight_layout()
+    fig1.savefig(
+        output_folder / f"{input_stem}_relative_article_availability.png", dpi=dpi
+    )
     plt.show()
 
-    # Additional plot: Data availability (open, conditional, closed) over time,
-    # split by category, relative to total counts (percent)
-    plt.figure("Relative Data availability over time (stacked bar, %)")
+    # --- Relative Data availability over time (stacked bar, %) ---
+    fig2 = plt.figure("Relative Data availability over time (stacked bar, %)")
     for idx, entry in enumerate(entries):
         if entry not in total_counts:
             continue
@@ -258,7 +388,7 @@ def statistics_over_time(df, column, entries):
         data_open = np.array(open_access_data_availability_counts[entry])
         data_conditional = np.array(conditional_access_data_availability_counts[entry])
         data_closed = np.array(closed_access_data_availability_counts[entry])
-        data_open_rel = 100 * data_open / data_total
+        data_open_rel = np.where(data_total > 0, 100 * data_open / data_total, 0)
         data_conditional_rel = np.where(
             data_total > 0, 100 * data_conditional / data_total, 0
         )
@@ -267,49 +397,37 @@ def statistics_over_time(df, column, entries):
             x + displacement[idx],
             data_open_rel,
             width=width / num_entries,
-            label=f"{entry} - Open",
-            color=open_colors[idx],
+            label="Yes",
+            color=data_colors["Yes"],
         )
         plt.bar(
             x + displacement[idx],
             data_conditional_rel,
             width=width / num_entries,
             bottom=data_open_rel,
-            label=f"{entry} - Conditional",
-            color=conditional_colors[idx],
+            label="On request",
+            color=data_colors["On request"],
         )
         plt.bar(
             x + displacement[idx],
             data_closed_rel,
             width=width / num_entries,
             bottom=data_open_rel + data_conditional_rel,
-            label=f"{entry} - Closed",
-            color=closed_colors[idx],
+            label="No",
+            color=data_colors["No"],
         )
 
     plt.xticks(x, years)
     plt.xlabel("Year")
     plt.ylabel("Percent of articles [%]")
-    # Put the legend to the top left corner of the plot
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
     plt.title("Relative Data Availability Over Time (Stacked Bar, %)")
     plt.ylim(0, 100)
     plt.tight_layout()
+    fig2.savefig(
+        output_folder / f"{input_stem}_relative_data_availability.png", dpi=dpi
+    )
     plt.show()
 
 
-statistics_over_time(
-    df,
-    "category",
-    ["computational", "experimental"],  # , "other", "theoretical"]
-)
-statistics_over_time(
-    df,
-    "subcategory",
-    ["simulation", "imaging"],  # , "computational", "experimental", "ml"]
-)
-# statistics_over_time(
-#    df,
-#    "subcategory2",
-#    ["pde", "simulation"],  # , "computational", "experimental", "ml"]
-# )
+statistics_over_time(df, "category", categories)
