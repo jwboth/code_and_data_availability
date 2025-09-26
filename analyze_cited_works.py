@@ -90,12 +90,12 @@ paper_colors = {
 }
 code_colors = {
     "No": "tab:red",
-    "On request": "tab:orange",
+    "On request": "#FFD600",  # bright yellow
     "Yes": "tab:green",
 }
 data_colors = {
     "No": "tab:red",
-    "On request": "tab:orange",
+    "On request": "#FFD600",  # bright yellow
     "Yes": "tab:green",
 }
 ai_colors = {
@@ -108,7 +108,8 @@ ai_colors = {
 # 6. Create figure with subplots
 # -------------------------
 # Set global font size for all plots
-plt.rcParams.update({"font.size": 16})
+plt.rcParams.update({"font.size": 20})
+dpi = 1000
 
 
 # --- Grouped Pie Charts: Paper, Code, Data Availability ---
@@ -153,9 +154,18 @@ axes_paper[-1].legend(
     loc="center left",
     bbox_to_anchor=(1, 0.5),
 )
-fig_paper.suptitle("Paper Availability", fontsize=16)
+fig_paper.text(
+    0.01,
+    0.5,
+    "Paper Availability",
+    va="center",
+    ha="center",
+    rotation=90,
+    fontsize=16,
+    transform=fig_paper.transFigure,
+)
 plt.tight_layout()
-fig_paper.savefig(save_folder / "paper_availability_pies.png", dpi=300)
+fig_paper.savefig(save_folder / "paper_availability_pies.png", dpi=dpi)
 plt.show()
 
 fig_code, axes_code = plt.subplots(
@@ -193,9 +203,18 @@ axes_code[-1].legend(
     loc="center left",
     bbox_to_anchor=(1, 0.5),
 )
-fig_code.suptitle("Code Availability", fontsize=16)
+fig_code.text(
+    0.01,
+    0.5,
+    "Code Availability",
+    va="center",
+    ha="center",
+    rotation=90,
+    fontsize=16,
+    transform=fig_code.transFigure,
+)
 plt.tight_layout()
-fig_code.savefig(save_folder / "code_availability_pies.png", dpi=300)
+fig_code.savefig(save_folder / "code_availability_pies.png", dpi=dpi)
 plt.show()
 
 fig_data, axes_data = plt.subplots(
@@ -233,9 +252,18 @@ axes_data[-1].legend(
     loc="center left",
     bbox_to_anchor=(1, 0.5),
 )
-fig_data.suptitle("Data Availability", fontsize=16)
+fig_data.text(
+    0.01,
+    0.5,
+    "Data Availability",
+    va="center",
+    ha="center",
+    rotation=90,
+    fontsize=16,
+    transform=fig_data.transFigure,
+)
 plt.tight_layout()
-fig_data.savefig(save_folder / "data_availability_pies.png", dpi=300)
+fig_data.savefig(save_folder / "data_availability_pies.png", dpi=dpi)
 plt.show()
 
 # --- AI Included Bar Plot ---
