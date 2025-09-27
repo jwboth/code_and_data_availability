@@ -197,7 +197,7 @@ if "year" in df.columns:
                 bbox_to_anchor=(1, 0.5),
             )
             fig_paper.text(
-                0.01,
+                0.03,
                 0.5,
                 f"Paper Availability\n{cat}",
                 va="center",
@@ -265,7 +265,7 @@ if "year" in df.columns:
                 bbox_to_anchor=(1, 0.5),
             )
             fig_data.text(
-                0.01,
+                0.03,
                 0.5,
                 f"Data Availability\n{cat}",
                 va="center",
@@ -280,6 +280,44 @@ if "year" in df.columns:
                 dpi=dpi,
             )
             plt.show()
+
+    # --- Data availability over time (all categories lumped, relative) ---
+    if data_col:
+        trend_data_year = df.groupby(["year", data_col]).size().unstack(fill_value=0)
+        data_order = ["Yes", "On request", "No"]
+        trend_data_year = trend_data_year.reindex(columns=data_order, fill_value=0)
+        # Compute relative values (percent)
+        totals = trend_data_year.sum(axis=1)
+        trend_data_year_rel = trend_data_year.divide(totals, axis=0).multiply(100)
+        fig, ax = plt.subplots(figsize=(8, 5))
+        bottom = np.zeros(len(trend_data_year_rel))
+        for label in data_order:
+            ax.bar(
+                trend_data_year_rel.index,
+                trend_data_year_rel[label],
+                label=label,
+                color=data_colors[label],
+                bottom=bottom,
+            )
+            bottom += trend_data_year_rel[label].values
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Percent of articles [%]")
+        ax.set_title("Relative Data Availability Over Time")
+        ax.legend(title="Data Availability", bbox_to_anchor=(1.05, 1), loc="upper left")
+        # Set x-ticks: first, last, and center year
+        years = trend_data_year_rel.index.values
+        if len(years) > 2:
+            center_idx = len(years) // 2
+            xticks = [years[0], years[center_idx], years[-1]]
+        else:
+            xticks = years
+        ax.set_xticks(xticks)
+        ax.set_xticklabels([str(int(y)) for y in xticks])
+        fig.tight_layout()
+        fig.savefig(
+            output_folder / f"{input_stem}_data_availability_per_year.png", dpi=dpi
+        )
+        plt.show()
 
 
 def statistics_over_time(df, column, entries):
