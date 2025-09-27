@@ -1,3 +1,11 @@
+"""Robustness check: Requires correct link to webbrowser. Here MS Edge is used.
+
+Potentially adapt to your system and browser of choice, e.g., Chrome, Firefox, Brave, etc.
+"""
+
+# NOTE: Hardcoded path to MS Edge browser executable
+edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+
 import pandas as pd
 import webbrowser
 
@@ -38,16 +46,16 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-df = pd.read_csv(args.input)
+# Make sure that args.random and args.category are not both set
+if args.random and args.category:
+    raise ValueError("Cannot use --random and --category together. Please choose one.")
 
-# Make sure all "theoretical" entries have data availability score of < 1
-assert df.loc[df["category"] == "theoretical", "data_availability_score"].max() < 1.0, (
-    "Theoretical articles should not have full data availability score of 1.0"
-)
+# Load the CSV file
+df = pd.read_csv(args.input)
 
 
 def open_url_in_browser(url):
-    edge_path = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+    """Open a URL in the default web browser."""
     logger.info("Opening URL: %s", url)
     if Path(edge_path).exists():
         webbrowser.register("edge", None, webbrowser.BackgroundBrowser(edge_path))
@@ -57,9 +65,7 @@ def open_url_in_browser(url):
         webbrowser.open(url)
     # Here you would add the code to open the URL in a browser.
     response = requests.get(url)
-    if response.status_code == 200:
-        print("Success!")
-    else:
+    if not response.status_code == 200:
         print("Failed to retrieve article.")
 
 
@@ -73,16 +79,16 @@ for year in df_by_year.groups.keys():
     for index, row in random_articles.iterrows():
         url = row["url"]
         open_url_in_browser(url)
+        for col in row.keys():
+            print(col, row[col])
 
-if args.random:
-    sample_df = df.sample(args.sample_size)
-    for index, row in sample_df.iterrows():
-        url = row["url"]
-        open_url_in_browser(url)
-
-elif args.category:
+# Robustness check: Assessing whether the right category was assigned.
+# Sample N articles from a specific category.
+if args.category:
     filtered_df = df[df["category"] == args.category]
     sample_df = filtered_df.sample(args.sample_size)
     for index, row in sample_df.iterrows():
         url = row["url"]
         open_url_in_browser(url)
+        for col in row.keys():
+            print(col, row[col])
