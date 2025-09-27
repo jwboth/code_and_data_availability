@@ -90,12 +90,12 @@ paper_colors = {
 }
 code_colors = {
     "No": "tab:red",
-    "On request": "#FFD600",  # bright yellow
+    "On request": "#FFC300",  # bright dark yellow
     "Yes": "tab:green",
 }
 data_colors = {
     "No": "tab:red",
-    "On request": "#FFD600",  # bright yellow
+    "On request": "#FFC300",  # bright dark yellow
     "Yes": "tab:green",
 }
 ai_colors = {
@@ -132,6 +132,7 @@ for i, period in enumerate(trend_paper.index):
         startangle=90,
         counterclock=False,
         textprops={"color": "white", "fontsize": 16},
+        wedgeprops={"edgecolor": "white", "linewidth": 1},
     )
     for autotext in autotexts:
         autotext.set_color("white")
@@ -145,6 +146,17 @@ for i, period in enumerate(trend_paper.index):
         va="center",
         transform=axes_paper[i].transAxes,
         fontsize=16,
+    )
+    # Add total count just below the period label
+    total = int(values.sum())
+    axes_paper[i].text(
+        0.5,
+        -0.10,
+        f"#total: {total}",
+        ha="center",
+        va="center",
+        transform=axes_paper[i].transAxes,
+        fontsize=14,
     )
 # Add a single legend to the last pie only, using the last values and wedges
 axes_paper[-1].legend(
@@ -183,6 +195,7 @@ for i, period in enumerate(trend_code.index):
         startangle=90,
         counterclock=False,
         textprops={"color": "white", "fontsize": 16},
+        wedgeprops={"edgecolor": "white", "linewidth": 1},
     )
     for autotext in autotexts:
         autotext.set_color("white")
@@ -195,6 +208,17 @@ for i, period in enumerate(trend_code.index):
         va="center",
         transform=axes_code[i].transAxes,
         fontsize=16,
+    )
+    # Add total count just below the period label
+    total = int(values.sum())
+    axes_code[i].text(
+        0.5,
+        -0.10,
+        f"#total: {total}",
+        ha="center",
+        va="center",
+        transform=axes_code[i].transAxes,
+        fontsize=14,
     )
 axes_code[-1].legend(
     wedges,
@@ -232,6 +256,7 @@ for i, period in enumerate(trend_data.index):
         startangle=90,
         counterclock=False,
         textprops={"color": "white", "fontsize": 16},
+        wedgeprops={"edgecolor": "white", "linewidth": 1},
     )
     for autotext in autotexts:
         autotext.set_color("white")
@@ -244,6 +269,17 @@ for i, period in enumerate(trend_data.index):
         va="center",
         transform=axes_data[i].transAxes,
         fontsize=16,
+    )
+    # Add total count just below the period label
+    total = int(values.sum())
+    axes_data[i].text(
+        0.5,
+        -0.10,
+        f"#total: {total}",
+        ha="center",
+        va="center",
+        transform=axes_data[i].transAxes,
+        fontsize=14,
     )
 axes_data[-1].legend(
     wedges,
