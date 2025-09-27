@@ -498,23 +498,23 @@ def main(
         data_availability_category.append(_data_availability_category)
 
         # Make sure the data availability section is not empty if the category is 'computational' or 'experimental'
-        if np.isclose(_data_availability_score, 1) and category[-1] == "other":
-            if re.search("code", data_availability_section[-1], re.I):
-                category[-1] = "computational"
-                subcategory[-1] = "N/A"
-                subcategory2[-1] = "N/A"
-                num_redefined += 1
+        # if np.isclose(_data_availability_score, 1) and category[-1] == "other":
+        #    if re.search("code", data_availability_section[-1], re.I):
+        #        category[-1] = "computational"
+        #        subcategory[-1] = "N/A"
+        #        subcategory2[-1] = "N/A"
+        #        num_redefined += 1
         # if np.isclose(_data_availability_score, 1) and category[-1] == "other":
         #    raise ValueError(
         #        f"Data availability section: {_data_availability_section}.\nCategory: '{category[-1]}' for {url}"
         #    )
         # if np.isclose(_data_availability_score, 1.0) and category[-1] == "theoretical":
-        if _data_availability_score > 0.1 and category[-1] == "theoretical":
-            # Identify the work as computational
-            category[-1] = "computational"
-            subcategory[-1] = "N/A"
-            subcategory2[-1] = "N/A"
-            num_redefined += 1
+        # if _data_availability_score > 0.1 and category[-1] == "theoretical":
+        #    # Identify the work as computational
+        #    category[-1] = "computational"
+        #    subcategory[-1] = "N/A"
+        #    subcategory2[-1] = "N/A"
+        #    num_redefined += 1
 
         # Debugging
         if False:
