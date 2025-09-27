@@ -21,12 +21,6 @@ def read_keywords_from_csv(filename):
         return [rf"{key.strip()}" for key in line.strip().split(",") if key.strip()]
 
 
-# Read keywords from CSV files as DataFrames
-data_availability_scores_df = pd.read_csv("availability_scores.csv")
-open_access_scores_df = pd.read_csv("open_access_scores.csv")
-categories_df = pd.read_csv("categories.csv")
-
-
 def fetch_url(url, timeout=20):
     try:
         r = requests.get(url, headers=HEADERS, timeout=timeout)
@@ -277,15 +271,13 @@ def determine_classification(df):
 def determine_category(df):
     # Extract active categories
     active_df = df[df["category_counter"] > 0].dropna(subset=["category"])
-    active_categories = [
-        (row["category"], row["category_counter"]) for _, row in active_df.iterrows()
-    ]
+    active_categories = set(
+        [(row["category"], row["category_counter"]) for _, row in active_df.iterrows()]
+    )
     if len(active_categories) == 0:
         return ("other",)
     else:
-        category = sorted(set(active_categories), key=lambda x: x[1], reverse=True)[0][
-            0
-        ]
+        category = sorted(active_categories, key=lambda x: x[1], reverse=True)[0][0]
 
     # Extract active subcategories
     active_df = active_df.groupby("category").get_group(category)
@@ -322,11 +314,21 @@ def determine_category(df):
     return (category, subcategory, subcategory2)
 
 
-def main(input_csv, output_csv):
-    num_redefined = 0
+def main(
+    input_csv,
+    output_csv,
+    categories_csv,
+    open_access_availablity_csv,
+    data_availability_csv,
+):
+    # Read keywords from CSV files as DataFrames
     df = pd.read_csv(input_csv, dtype=str)
+    data_availability_scores_df = pd.read_csv(data_availability_csv)
+    open_access_scores_df = pd.read_csv(open_access_availablity_csv)
+    categories_df = pd.read_csv(categories_csv)
 
     # Count articles
+    num_redefined = 0
     logging.info("Read %d rows from %s", len(df), input_csv)
 
     # Unify the categories from TiPM style to generic style
@@ -560,6 +562,7 @@ def main(input_csv, output_csv):
     df["data_availability_section"] = data_availability_section
 
     # Store data frame to file
+    output_csv.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(output_csv, index=False)
     logging.info("Wrote results to %s", output_csv)
 
@@ -569,8 +572,19 @@ if __name__ == "__main__":
         description="Extract 'Data availability' text from article URLs in a CSV"
     )
     p.add_argument("--input", "-i", required=True, help="input CSV file")
+    p.add_argument("--output", "-o", required=True, help="output CSV file")
+    p.add_argument("--categories", "-c", required=True, help="categories CSV file")
     p.add_argument(
-        "--output", "-o", default="with_data_availability.csv", help="output CSV file"
+        "--open_access", "-oa", required=True, help="open access availability CSV file"
+    )
+    p.add_argument(
+        "--data_availability", "-da", required=True, help="data availability CSV file"
     )
     args = p.parse_args()
-    main(Path(args.input), Path(args.output))
+    main(
+        Path(args.input),
+        Path(args.output),
+        Path(args.categories),
+        Path(args.open_access),
+        Path(args.data_availability),
+    )
