@@ -316,7 +316,7 @@ if "year" in df.columns:
             bottom += trend_data_year_rel[label].values
         ax.set_xlabel("Year")
         ax.set_ylabel("Percent of articles [%]")
-        ax.set_title("Relative Data Availability Over Time")
+        ax.set_title(f"Data Availability | {args.journal}")
         ax.legend(title="Data Availability", bbox_to_anchor=(1.05, 1), loc="upper left")
         # Set x-ticks: first, last, and center year
         years = trend_data_year_rel.index.values
