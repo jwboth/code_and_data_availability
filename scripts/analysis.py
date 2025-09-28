@@ -483,7 +483,6 @@ def main(
         _data_availability_section += none_to_txt(
             extract_section(soup, title=["ethics"])
         )
-        data_availability_section.append(_data_availability_section)
         # some articles use the additional information
         _data_availability_section += none_to_txt(
             extract_section(soup, title=["additional", "information"])
