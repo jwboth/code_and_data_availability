@@ -30,6 +30,13 @@ parser.add_argument(
     required=True,
     help="Journal name to print in plots",
 )
+parser.add_argument(
+    "--years",
+    "-y",
+    type=int,
+    nargs="+",
+    default=None,
+)
 args = parser.parse_args()
 categories = args.categories
 
@@ -44,6 +51,11 @@ input_stem = input_path.stem
 # Restrict to given categories
 if categories != ["All"]:
     df = df[df["category"].isin(categories)]
+
+# Restrict to given years
+if args.years is not None:
+    year_span = [i for i in range(min(args.years), max(args.years) + 1)]
+    df = df[df["year"].isin(year_span)]
 
 # Display the categories
 df_by_category = df.groupby("category", observed=False)
@@ -305,7 +317,7 @@ if "year" in df.columns:
         trend_data_year_rel = trend_data_year.divide(totals, axis=0).multiply(100)
         fig, ax = plt.subplots(figsize=(8, 5))
         bottom = np.zeros(len(trend_data_year_rel))
-        for label in data_order:
+        for i, label in enumerate(data_order):
             ax.bar(
                 trend_data_year_rel.index,
                 trend_data_year_rel[label],
@@ -314,6 +326,18 @@ if "year" in df.columns:
                 bottom=bottom,
             )
             bottom += trend_data_year_rel[label].values
+        # Add totals on top of bars
+        for i, total in enumerate(totals):
+            ax.text(
+                trend_data_year_rel.index[i],
+                98,
+                f"{int(total)}",
+                ha="center",
+                va="top",
+                fontsize=10,
+                color="white",
+                rotation=90,
+            )
         ax.set_xlabel("Year")
         ax.set_ylabel("Percent of articles [%]")
         ax.set_title(f"Data Availability | {args.journal}")
