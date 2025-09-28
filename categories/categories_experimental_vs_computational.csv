@@ -41,18 +41,14 @@ cnn\b,computational,ml,ml
 \bai\b,computational,ml,ml
 deep learning,computational,ml,ml
 machine learning,computational,ml,ml
-experiment,experimental,experimental,experimental
-experimental,experimental,experimental,experimental
 laboratory,experimental,experimental,experimental
 image,experimental,imaging,
 imaging,experimental,imaging,
-sem,experimental,imaging,optical
+\bsem\b,experimental,imaging,optical
 tomography,experimental,imaging,tomography
 mri\b,experimental,imaging,tomography
-scan,experimental,imaging,
 \bnmr\b,experimental,imaging,tomography
 resonance,experimental,imaging,tomography
-magnetic,experimental,imaging,tomography
 pet,experimental,imaging,tomography
 \bct\b,experimental,imaging,tomography
 micro-ct,experimental,imaging,tomography
@@ -61,7 +57,6 @@ xray,experimental,imaging,synchrotron
 x-ray,experimental,imaging,synchrotron
 microscopy,experimental,imaging,optical
 microscope,experimental,imaging,optical
-optical,experimental,imaging,optical
 photo,experimental,imaging,optical
 spectromet,experimental,imaging,spectroscopy
 scopy,experimental,imaging,spectroscopy
@@ -105,3 +100,13 @@ theoretical,other,theoretical,
 analytical,other,theoretical,
 estimate,other,theoretical,
 visualized,experimental,imaging,image analysis
+simulated,computational,simulation,simulation
+history matching,computational,,
+pore network,computational,,
+pore-network,computational,,
+digital rock,experimental,,
+microfluidic,experimental,,
+dns,computational,,
+lattice-boltzmann,computational,,
+seismic,other,,
+gaussian,other,,
