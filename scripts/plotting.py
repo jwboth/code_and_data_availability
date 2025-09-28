@@ -5,7 +5,7 @@ from pathlib import Path
 
 import argparse
 
-dpi = 100
+dpi = 1000
 plt.rcParams.update({"font.size": 20})
 
 parser = argparse.ArgumentParser(description="Visualize article analysis results")
@@ -24,6 +24,12 @@ parser.add_argument(
     default=["All"],
     help="List of categories to include in the analysis",
 )
+parser.add_argument(
+    "--journal",
+    type=str,
+    required=True,
+    help="Journal name to print in plots",
+)
 args = parser.parse_args()
 categories = args.categories
 
@@ -40,7 +46,7 @@ if categories != ["All"]:
     df = df[df["category"].isin(categories)]
 
 # Display the categories
-df_by_category = df.groupby("category")
+df_by_category = df.groupby("category", observed=False)
 category_counts = df_by_category.size()
 category_fig = plt.figure("Category distribution")
 plt.pie(category_counts, labels=category_counts.index, autopct="%1.1f%%")
@@ -49,7 +55,7 @@ category_fig.savefig(output_folder / f"{input_stem}_category_distribution.png", 
 plt.show()
 
 # Display the subcategories
-df_by_subcategory = df.groupby("subcategory")
+df_by_subcategory = df.groupby("subcategory", observed=False)
 subcategory_counts = df_by_subcategory.size()
 subcategory_fig = plt.figure("Subcategory distribution")
 plt.pie(subcategory_counts, labels=subcategory_counts.index, autopct="%1.1f%%")
@@ -70,13 +76,13 @@ paper_colors = {
     "Open access": "tab:green",
 }
 data_colors = {
-    "No": "tab:red",
+    "Not open": "tab:red",
     "On request": "#FFC300",  # bright dark yellow
-    "Yes": "tab:green",
+    "Open access": "tab:green",
 }
 
 subcategory_year_counts = (
-    df.groupby(["year", "subcategory"]).size().unstack(fill_value=0)
+    df.groupby(["year", "subcategory"], observed=False).size().unstack(fill_value=0)
 )
 fig_subcat_line, ax = plt.subplots(figsize=(8, 5))
 for i, subcat in enumerate(subcategory_counts.index):
@@ -98,7 +104,9 @@ fig_subcat_line.savefig(
 plt.show()
 
 # --- Category count per year: line plot ---
-category_year_counts = df.groupby(["year", "category"]).size().unstack(fill_value=0)
+category_year_counts = (
+    df.groupby(["year", "category"], observed=False).size().unstack(fill_value=0)
+)
 fig_cat_line, ax = plt.subplots(figsize=(8, 5))
 for i, cat in enumerate(category_counts.index):
     ax.plot(
@@ -132,9 +140,9 @@ if "year" in df.columns:
     paper_col = "article_availability"
     data_col = "data_availability"
 
-    # Map scores 0 to "No", 0.5 to "On request", 1 to "Yes"
+    # Map scores 0 to "Not open", 0.5 to "On request", 1 to "Open access"
     paper_availability_map = {0: "Not open", 1: "Open access"}
-    data_availability_map = {0: "No", 0.5: "On request", 1: "Yes"}
+    data_availability_map = {0: "Not open", 0.5: "On request", 1: "Open access"}
     df[paper_col] = df[paper_col + "_score"].map(paper_availability_map)
     df[data_col] = df[data_col + "_score"].map(data_availability_map)
 
@@ -147,7 +155,9 @@ if "year" in df.columns:
             # Paper availability
             paper_order = ["Open access", "Not open"]
             trend_paper = (
-                df_cat.groupby(["Period", paper_col]).size().unstack(fill_value=0)
+                df_cat.groupby(["Period", paper_col], observed=False)
+                .size()
+                .unstack(fill_value=0)
             )
             trend_paper = trend_paper.reindex(columns=paper_order, fill_value=0)
             fig_paper, axes_paper = plt.subplots(
@@ -199,7 +209,7 @@ if "year" in df.columns:
             fig_paper.text(
                 0.03,
                 0.5,
-                f"Paper Availability\n{cat}",
+                f"Paper Availability\n{args.journal} | {cat}",
                 va="center",
                 ha="center",
                 rotation=90,
@@ -213,9 +223,11 @@ if "year" in df.columns:
             )
             plt.show()
             # Data availability
-            data_order = ["Yes", "On request", "No"]
+            data_order = ["Open access", "On request", "Not open"]
             trend_data = (
-                df_cat.groupby(["Period", data_col]).size().unstack(fill_value=0)
+                df_cat.groupby(["Period", data_col], observed=False)
+                .size()
+                .unstack(fill_value=0)
             )
             trend_data = trend_data.reindex(columns=data_order, fill_value=0)
             fig_data, axes_data = plt.subplots(
@@ -267,7 +279,7 @@ if "year" in df.columns:
             fig_data.text(
                 0.03,
                 0.5,
-                f"Data Availability\n{cat}",
+                f"Data Availability\n{args.journal} | {cat}",
                 va="center",
                 ha="center",
                 rotation=90,
@@ -283,8 +295,10 @@ if "year" in df.columns:
 
     # --- Data availability over time (all categories lumped, relative) ---
     if data_col:
-        trend_data_year = df.groupby(["year", data_col]).size().unstack(fill_value=0)
-        data_order = ["Yes", "On request", "No"]
+        trend_data_year = (
+            df.groupby(["year", data_col], observed=False).size().unstack(fill_value=0)
+        )
+        data_order = ["Open access", "On request", "Not open"]
         trend_data_year = trend_data_year.reindex(columns=data_order, fill_value=0)
         # Compute relative values (percent)
         totals = trend_data_year.sum(axis=1)
@@ -339,13 +353,13 @@ def statistics_over_time(df, column, entries):
     }
 
     # Make statistics over time
-    df_by_year = df.groupby("year")
+    df_by_year = df.groupby("year", observed=False)
     for year_value, year_group in df_by_year:
         if year_value <= 2018:
             continue
 
         years.append(year_value)
-        df_by_column = year_group.groupby(column)
+        df_by_column = year_group.groupby(column, observed=False)
         for entry in entries:
             if entry not in df_by_column.groups:
                 # No entries for this category in this year
@@ -416,16 +430,14 @@ def statistics_over_time(df, column, entries):
     plt.xlabel("Year")
     plt.ylabel("Percent of articles [%]")
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
-    plt.title("Relative Article Availability Over Time (Stacked Bar, %)")
+    plt.title("Article Availability Over Time (Stacked Bar, %)")
     plt.ylim(0, 100)
     plt.tight_layout()
-    fig1.savefig(
-        output_folder / f"{input_stem}_relative_article_availability.png", dpi=dpi
-    )
+    fig1.savefig(output_folder / f"{input_stem}_paper_availability.png", dpi=dpi)
     plt.show()
 
     # --- Relative Data availability over time (stacked bar, %) ---
-    fig2 = plt.figure("Relative Data availability over time (stacked bar, %)")
+    fig2 = plt.figure("Data availability over time (stacked bar, %)")
     for idx, entry in enumerate(entries):
         if entry not in total_counts:
             continue
@@ -442,8 +454,8 @@ def statistics_over_time(df, column, entries):
             x + displacement[idx],
             data_open_rel,
             width=width / num_entries,
-            label="Yes",
-            color=data_colors["Yes"],
+            label="Open access",
+            color=data_colors["Open access"],
         )
         plt.bar(
             x + displacement[idx],
@@ -458,20 +470,18 @@ def statistics_over_time(df, column, entries):
             data_closed_rel,
             width=width / num_entries,
             bottom=data_open_rel + data_conditional_rel,
-            label="No",
-            color=data_colors["No"],
+            label="Not open",
+            color=data_colors["Not open"],
         )
 
     plt.xticks(x, years)
     plt.xlabel("Year")
     plt.ylabel("Percent of articles [%]")
     plt.legend(loc="upper left", bbox_to_anchor=(1, 1))
-    plt.title("Relative Data Availability Over Time (Stacked Bar, %)")
+    plt.title(f"Data Availability | {args.journal}")
     plt.ylim(0, 100)
     plt.tight_layout()
-    fig2.savefig(
-        output_folder / f"{input_stem}_relative_data_availability.png", dpi=dpi
-    )
+    fig2.savefig(output_folder / f"{input_stem}_data_availability.png", dpi=dpi)
     plt.show()
 
 
