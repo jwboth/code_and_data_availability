@@ -9,6 +9,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
+import warnings
+
+# Suppress pandas SettingWithCopyWarning and UserWarning for chained indexing
+warnings.simplefilter(action="ignore", category=UserWarning)
+warnings.simplefilter(action="ignore", category=pd.errors.SettingWithCopyWarning)
 
 path = Path("../database") / "cited_works.xlsx"
 save_folder = Path("../results")
@@ -47,14 +52,14 @@ data["code_availability_final"] = (
     data["code availability"]
     .str.strip()
     .str.lower()
-    .map({"yes": "Yes", "no": "No", "on request": "On request"})
+    .map({"yes": "Open access", "no": "Not open", "on request": "On request"})
 )
 # Data
 data["data_availability_final"] = (
     data["Data availability"]
     .str.strip()
     .str.lower()
-    .map({"yes": "Yes", "no": "No", "on request": "On request"})
+    .map({"yes": "Open access", "no": "Not open", "on request": "On request"})
 )
 # AI
 data["AI_included_final"] = (
@@ -66,19 +71,23 @@ data["AI_included_final"] = (
 # 4. Group categorical trends and ensure all categories present
 # -------------------------
 def group_trend(col, categories):
-    trend = data.groupby(["Period", col]).size().unstack(fill_value=0)
+    trend = data.groupby(["Period", col], observed=False).size().unstack(fill_value=0)
     trend = trend.reindex(columns=categories, fill_value=0)
     return trend.loc[trend.sum(axis=1) > 0]
 
 
 def return_total_number_per_period(col):
-    trend = data.groupby(["Period", col]).size().unstack(fill_value=0)
+    trend = data.groupby(["Period", col], observed=False).size().unstack(fill_value=0)
     return trend.loc[trend.sum(axis=1) > 0].sum(axis=1)
 
 
 trend_paper = group_trend("paper_availability_final", ["Open access", "Not open"])
-trend_code = group_trend("code_availability_final", ["Yes", "On request", "No"])
-trend_data = group_trend("data_availability_final", ["Yes", "On request", "No"])
+trend_code = group_trend(
+    "code_availability_final", ["Open access", "On request", "Not open"]
+)
+trend_data = group_trend(
+    "data_availability_final", ["Open access", "On request", "Not open"]
+)
 trend_ai = group_trend("AI_included_final", ["Yes", "No"])
 
 # -------------------------
@@ -89,14 +98,14 @@ paper_colors = {
     "Open access": "tab:green",
 }
 code_colors = {
-    "No": "tab:red",
+    "Not open": "tab:red",
     "On request": "#FFC300",  # bright dark yellow
-    "Yes": "tab:green",
+    "Open access": "tab:green",
 }
 data_colors = {
-    "No": "tab:red",
+    "Not open": "tab:red",
     "On request": "#FFC300",  # bright dark yellow
-    "Yes": "tab:green",
+    "Open access": "tab:green",
 }
 ai_colors = {
     "No": "tab:pink",
@@ -167,9 +176,9 @@ axes_paper[-1].legend(
     bbox_to_anchor=(1, 0.5),
 )
 fig_paper.text(
-    0.01,
+    0.012,
     0.5,
-    "Paper Availability",
+    "Paper Availability\ncited works | imaging",
     va="center",
     ha="center",
     rotation=90,
@@ -228,9 +237,9 @@ axes_code[-1].legend(
     bbox_to_anchor=(1, 0.5),
 )
 fig_code.text(
-    0.01,
+    0.012,
     0.5,
-    "Code Availability",
+    "Code Availability\ncited works | imaging",
     va="center",
     ha="center",
     rotation=90,
@@ -289,9 +298,9 @@ axes_data[-1].legend(
     bbox_to_anchor=(1, 0.5),
 )
 fig_data.text(
-    0.01,
+    0.012,
     0.5,
-    "Data Availability",
+    "Data Availability\ncited works | imaging",
     va="center",
     ha="center",
     rotation=90,
@@ -372,7 +381,7 @@ sns.scatterplot(
 )
 for period in labels:
     period_data = data[data["Period"] == period][
-        (data["data_availability_final"] == "Yes")
+        (data["data_availability_final"] == "Open access")
         | (data["data_availability_final"] == "On request")
     ]
     if not period_data.empty:
@@ -402,4 +411,27 @@ ax.set_xlabel("Year")
 ax.set_yscale("log")
 ax.legend(title="Data Availability")
 plt.tight_layout()
+plt.show()
+
+# Bar plot of relative data availability over time (per year)
+fig, ax = plt.subplots(figsize=(10, 6))
+trend_data_yearly = (
+    data.groupby(["Year", "data_availability_final"]).size().unstack(fill_value=0)
+)
+trend_data_yearly = trend_data_yearly.reindex(
+    columns=["Open access", "On request", "Not open"], fill_value=0
+)
+trend_data_yearly = trend_data_yearly.div(trend_data_yearly.sum(axis=1), axis=0)
+trend_data_yearly.plot(
+    kind="bar",
+    stacked=True,
+    color=[data_colors[c] for c in trend_data_yearly.columns],
+    ax=ax,
+)
+ax.set_title("Data Availability | cited works")
+ax.set_ylabel("Proportion")
+ax.set_xlabel("Year")
+ax.legend(title="Data Availability", bbox_to_anchor=(1, 1))
+plt.tight_layout()
+plt.savefig(save_folder / "cited_works_data_availability.png", dpi=dpi)
 plt.show()
