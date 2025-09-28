@@ -10,8 +10,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from pathlib import Path
 
-path = Path("cited_works") / "data for ASIC.xlsx"
-save_folder = Path("cited_works") / "figures"
+path = Path("../database") / "cited_works.xlsx"
+save_folder = Path("../results")
 save_folder.mkdir(parents=True, exist_ok=True)
 
 # 0. Load data
@@ -177,7 +177,7 @@ fig_paper.text(
     transform=fig_paper.transFigure,
 )
 plt.tight_layout()
-fig_paper.savefig(save_folder / "paper_availability_pies.png", dpi=dpi)
+fig_paper.savefig(save_folder / "cited_works_paper_availability_pies.png", dpi=dpi)
 plt.show()
 
 fig_code, axes_code = plt.subplots(
@@ -238,7 +238,7 @@ fig_code.text(
     transform=fig_code.transFigure,
 )
 plt.tight_layout()
-fig_code.savefig(save_folder / "code_availability_pies.png", dpi=dpi)
+fig_code.savefig(save_folder / "cited_works_code_availability_pies.png", dpi=dpi)
 plt.show()
 
 fig_data, axes_data = plt.subplots(
@@ -299,7 +299,7 @@ fig_data.text(
     transform=fig_data.transFigure,
 )
 plt.tight_layout()
-fig_data.savefig(save_folder / "data_availability_pies.png", dpi=dpi)
+fig_data.savefig(save_folder / "cited_works_data_availability_pies.png", dpi=dpi)
 plt.show()
 
 # --- AI Included Bar Plot ---
