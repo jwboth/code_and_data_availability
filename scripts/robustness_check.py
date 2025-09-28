@@ -39,6 +39,23 @@ parser.add_argument(
     help="Category to filter articles by before sampling",
 )
 parser.add_argument(
+    "--years",
+    type=int,
+    nargs="+",
+)
+parser.add_argument(
+    "--only-full-data",
+    action="store_true",
+)
+parser.add_argument(
+    "--only-partial-data",
+    action="store_true",
+)
+parser.add_argument(
+    "--only-no-data",
+    action="store_true",
+)
+parser.add_argument(
     "--sample-size",
     type=int,
     default=5,
@@ -52,6 +69,18 @@ if args.random and args.category:
 
 # Load the CSV file
 df = pd.read_csv(args.input)
+
+if args.years:
+    year_span = list(range(min(args.years), max(args.years) + 1))
+    df = df[df["year"].isin(year_span)]
+
+if args.only_full_data:
+    print(df["data_availability_score"].value_counts())
+    df = df[df["data_availability_score"] == 1.0]
+if args.only_partial_data:
+    df = df[df["data_availability_score"] == 0.5]
+if args.only_no_data:
+    df = df[df["data_availability_score"] == 0.0]
 
 
 def open_url_in_browser(url):
@@ -75,7 +104,10 @@ df_by_year = df.groupby("year")
 for year in df_by_year.groups.keys():
     if not args.sample_years:
         continue
-    random_articles = df_by_year.get_group(year).sample(args.sample_size)
+    if args.sample_size < len(df_by_year.get_group(year)):
+        random_articles = df_by_year.get_group(year).sample(args.sample_size)
+    else:
+        random_articles = df_by_year.get_group(year)
     for index, row in random_articles.iterrows():
         url = row["url"]
         open_url_in_browser(url)
@@ -86,7 +118,7 @@ for year in df_by_year.groups.keys():
 # Sample N articles from a specific category.
 if args.category:
     filtered_df = df[df["category"] == args.category]
-    sample_df = filtered_df.sample(args.sample_size)
+    sample_df = filtered_df.sample(min(args.sample_size, len(filtered_df)))
     for index, row in sample_df.iterrows():
         url = row["url"]
         open_url_in_browser(url)
