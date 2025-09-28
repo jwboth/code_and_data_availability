@@ -6,7 +6,6 @@ from pathlib import Path
 import pandas as pd
 import requests
 from bs4 import BeautifulSoup
-import numpy as np
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 
@@ -160,13 +159,6 @@ def find_frequent_key(df, column_key, column_count):
     return max_value
 
 
-def find_all_section_titles(soup):
-    # List all data-title attributes for all sections in soup
-    sections = soup.find_all("section", attrs={"data-title": True})
-    titles = [sec["data-title"] for sec in sections if "data-title" in sec.attrs]
-    return titles
-
-
 def extract_section(soup, title: list):
     sections = soup.find_all("section", attrs={"data-title": True})
     sections_list = [sec for sec in sections]
@@ -178,26 +170,13 @@ def extract_section(soup, title: list):
         sum([1 for key in title if re.search(rf"{key}", sec_title, re.I)])
         for sec_title in section_titles
     ]
-    if not title_matches or max(title_matches) == 0:
+    if not title_matches or max(title_matches) < len(title):
         return None
 
     # Extract the section with the highest match count
     max_index = title_matches.index(max(title_matches))
     section = sections_list[max_index]
     return section.text
-
-
-def find_all_sections(soup, title: list):
-    # Find section that machtes
-    # <section lang="en"><div class="c-article-section" id="Abs1-section"><div class="c-article-section__content" id="Abs1-content"><h3 class="c-article__sub-heading" data-test="abstract-sub-heading">
-    sections = soup.find_all("section")
-    sections_list = [sec for sec in sections]
-    for sec in sections_list:
-        try:
-            print(sec)
-        except Exception as e:
-            print(f"Error printing section: {e}")
-    return sections
 
 
 def extract_meta(soup, content: list):
@@ -483,9 +462,32 @@ def main(
         classification.append(_classification)
 
         # Extract section on data/code availability
-        _data_availability_section = extract_section(soup, title=["data", "avail"])
-        if not _data_availability_section:
-            _data_availability_section = extract_section(soup, title=["code", "avail"])
+        def none_to_txt(x):
+            return "" if x is None else x
+
+        _data_availability_section = ""
+        _data_availability_section += none_to_txt(
+            extract_section(soup, title=["data", "avail"])
+        )
+        _data_availability_section += none_to_txt(
+            extract_section(soup, title=["code", "avail"])
+        )
+        # Some articles use "Notes" or the "Acknowledgements" section - only add if nothing else found
+        _data_availability_section += none_to_txt(
+            extract_section(soup, title=["notes"])
+        )
+        _data_availability_section += none_to_txt(
+            extract_section(soup, title=["acknowledgements"])
+        )
+        # some articles use the Ethics section
+        _data_availability_section += none_to_txt(
+            extract_section(soup, title=["ethics"])
+        )
+        data_availability_section.append(_data_availability_section)
+        # some articles use the additional information
+        _data_availability_section += none_to_txt(
+            extract_section(soup, title=["additional", "information"])
+        )
         data_availability_section.append(_data_availability_section)
 
         # Score data availability
