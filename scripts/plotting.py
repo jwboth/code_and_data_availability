@@ -266,6 +266,7 @@ if "year" in df.columns:
                 wedges, texts, autotexts = axes_data[i].pie(
                     values,
                     labels=None,
+                    # autopct=lambda pct: "", # NOTE: Use for printing custom figures.
                     autopct=lambda pct: f"{pct:.1f}%" if pct > 0 else "",
                     startangle=90,
                     counterclock=False,
