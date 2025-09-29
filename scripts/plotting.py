@@ -320,6 +320,60 @@ if "year" in df.columns:
             )
             plt.show()
 
+    # --- Paper availability over time (all categories lumped, relative) ---
+    if paper_col:
+        trend_paper_year = (
+            df.groupby(["year", paper_col], observed=False).size().unstack(fill_value=0)
+        )
+        paper_order = ["Open access", "Not open"]
+        trend_paper_year = trend_paper_year.reindex(columns=paper_order, fill_value=0)
+        # Compute relative values (percent)
+        totals = trend_paper_year.sum(axis=1)
+        trend_paper_year_rel = trend_paper_year.divide(totals, axis=0).multiply(100)
+        fig, ax = plt.subplots(figsize=(8, 5))
+        bottom = np.zeros(len(trend_paper_year_rel))
+        for i, label in enumerate(paper_order):
+            ax.bar(
+                trend_paper_year_rel.index,
+                trend_paper_year_rel[label],
+                label=label,
+                color=paper_colors[label],
+                bottom=bottom,
+            )
+            bottom += trend_paper_year_rel[label].values
+        # Add totals on top of bars
+        for i, total in enumerate(totals):
+            ax.text(
+                trend_paper_year_rel.index[i],
+                98,
+                f"{int(total)}",
+                ha="center",
+                va="top",
+                fontsize=10,
+                color="white",
+                rotation=90,
+            )
+        ax.set_xlabel("Year")
+        ax.set_ylabel("Percent of articles [%]")
+        ax.set_title(f"Paper Availability | {args.journal}")
+        ax.legend(
+            title="Paper Availability", bbox_to_anchor=(1.05, 1), loc="upper left"
+        )
+        # Set x-ticks: first, last, and center year
+        years = trend_paper_year_rel.index.values
+        if len(years) > 2:
+            center_idx = len(years) // 2
+            xticks = [years[0], years[center_idx], years[-1]]
+        else:
+            xticks = years
+        ax.set_xticks(xticks)
+        ax.set_xticklabels([str(int(y)) for y in xticks])
+        fig.tight_layout()
+        fig.savefig(
+            output_folder / f"{input_stem}_paper_availability_per_year.png", dpi=dpi
+        )
+        plt.show()
+
     # --- Data availability over time (all categories lumped, relative) ---
     if data_col:
         trend_data_year = (
