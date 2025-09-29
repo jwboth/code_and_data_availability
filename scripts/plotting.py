@@ -37,6 +37,18 @@ parser.add_argument(
     nargs="+",
     default=None,
 )
+parser.add_argument(
+    "--horizontal-shift",
+    type=float,
+    default=0.03,
+    help="Horizontal shift for title of grouped pie charts",
+)
+parser.add_argument(
+    "--pie-size",
+    "-p",
+    type=float,
+    default=1,
+)
 args = parser.parse_args()
 categories = args.categories
 
@@ -179,6 +191,7 @@ if "year" in df.columns:
                 axes_paper = [axes_paper]
             for i, period in enumerate(trend_paper.index):
                 values = trend_paper.loc[period]
+                # Allow to control the radius using args.pie_size
                 wedges, texts, autotexts = axes_paper[i].pie(
                     values,
                     labels=None,
@@ -188,6 +201,7 @@ if "year" in df.columns:
                     textprops={"color": "white", "fontsize": 14},
                     wedgeprops={"edgecolor": "white", "linewidth": 1},
                     colors=[paper_colors[c] for c in values.index],
+                    radius=args.pie_size,
                 )
                 for autotext in autotexts:
                     autotext.set_color("white")
@@ -219,7 +233,7 @@ if "year" in df.columns:
                 bbox_to_anchor=(1, 0.5),
             )
             fig_paper.text(
-                0.03,
+                args.horizontal_shift,
                 0.5,
                 f"Paper Availability\n{args.journal} | {cat}",
                 va="center",
@@ -258,6 +272,7 @@ if "year" in df.columns:
                     textprops={"color": "white", "fontsize": 14},
                     wedgeprops={"edgecolor": "white", "linewidth": 1},
                     colors=[data_colors[c] for c in values.index],
+                    radius=args.pie_size,
                 )
                 for autotext in autotexts:
                     autotext.set_color("white")
@@ -289,7 +304,7 @@ if "year" in df.columns:
                 bbox_to_anchor=(1, 0.5),
             )
             fig_data.text(
-                0.03,
+                args.horizontal_shift,
                 0.5,
                 f"Data Availability\n{args.journal} | {cat}",
                 va="center",
